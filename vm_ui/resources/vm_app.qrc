@@ -1,0 +1,7 @@
+<RCC>
+    <qresource prefix="/icons">
+        <file>icons/vm_window_minimize.svg</file>
+        <file>icons/vm_window_maximize.svg</file>
+        <file>icons/vm_window_close.svg</file>
+    </qresource>
+</RCC>
