@@ -2,7 +2,7 @@
 
 ## 构建
 
-通信模块使用 make 独立构建：
+通信模块使用 make 独立构建，Windows、Git Bash 和 Linux 环境均应直接执行：
 
 ```sh
 make -C vm_com all
@@ -13,7 +13,7 @@ make -C vm_com all
 - 静态库：`build/vm_com_make/libvm_communication.a`
 - 对外头文件：`build/vm_com_make/include/vm_communication.h`、`vm_status.h`
 
-UI 模块只能从 `build/vm_com_make/include` 和 `build/vm_com_make/libvm_communication.a` 使用通信模块，不能直接包含 `vm_com/private`。
+UI 模块只能从 `build/vm_com_make/include` 和 `build/vm_com_make/libvm_communication.a` 使用通信模块，不能直接包含 `vm_com/src/<layer>/include` 下的内部头文件。
 
 ## 最小调用流程
 
@@ -74,6 +74,8 @@ vm_comm_destroy(comm);
 - `VM_COMM_EVENT_WRITE_DONE`：写入确认。
 - `VM_COMM_EVENT_ERROR`：协议错误、目标值范围错误或底层通信错误。
 
-## 依赖
+## 运行依赖
 
-当前串口路径依赖 Qt UI 进程提供的轮询定时器调用 `vm_comm_poll()`。CAN、CANFD、以太网的配置结构已保留，驱动接入后仍走同一 COM 接口。
+当前第一阶段只实现串口 + 自定义协议。UI 进程需要周期性调用 `vm_comm_poll()`，模块内部会执行 `Serial IF -> PduR -> Services -> Custom Service -> COM` 的接收处理。
+
+串口驱动节点在 IF 层注册：Windows 平台使用 `src/mcal/windows/vm_windows_serial.c`，POSIX 平台使用 `src/mcal/posix/vm_posix_serial.c`。CAN、CANFD 和以太网配置字段保留，后续接入时仍走同一 COM 业务入口。

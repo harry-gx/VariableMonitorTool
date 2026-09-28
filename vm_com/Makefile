@@ -62,20 +62,28 @@ endif
 
 CFLAGS ?= -std=c11 -O2
 CFLAGS += -D__USE_MINGW_ANSI_STDIO=1 -Wall -Wextra -Werror -pedantic
-CPPFLAGS += -Iinclude -Iprivate
+CPPFLAGS += -Iinclude \
+            -Isrc/common/include \
+            -Isrc/com/include \
+            -Isrc/if/include \
+            -Isrc/pdur/include \
+            -Isrc/mcal/include \
+            -Isrc/services/include \
+            -Isrc/services/custom/include
 
 LIB := $(BUILD_DIR)/libvm_communication.a
 
 SOURCES := \
-    src/vm_communication.c \
+    src/com/vm_communication.c \
     src/com/vm_value_codec.c \
-    src/driver/vm_can_transport.c \
-    src/protocol/vm_custom_protocol.c \
-    src/protocol/vm_protocol_registry.c \
-    src/route/vm_router.c \
-    src/transport/vm_loopback_transport.c \
-    src/transport/vm_serial_transport.c \
-    src/transport/vm_transport_registry.c
+    src/mcal/vm_mcal_serial.c \
+    src/mcal/windows/vm_windows_serial.c \
+    src/mcal/posix/vm_posix_serial.c \
+    src/if/vm_serial_if.c \
+    src/pdur/vm_pdur.c \
+    src/services/vm_service.c \
+    src/services/custom/vm_custom_service.c \
+    src/services/custom/vm_custom_protocol.c
 
 OBJECTS := $(patsubst %.c,$(OBJ_DIR)/%.o,$(SOURCES))
 
@@ -86,9 +94,7 @@ PUBLIC_HEADERS := \
 PUBLIC_HEADER_OUTPUTS := $(patsubst include/%,$(PUBLIC_INCLUDE_DIR)/%,$(PUBLIC_HEADERS))
 
 TEST_EXES := \
-    $(TEST_DIR)/vm_test_registry$(EXE_EXT) \
-    $(TEST_DIR)/vm_test_custom_protocol$(EXE_EXT) \
-    $(TEST_DIR)/vm_test_loopback$(EXE_EXT)
+    $(TEST_DIR)/vm_test_custom_protocol$(EXE_EXT)
 
 .PHONY: all lib install_headers test clean
 
@@ -110,22 +116,14 @@ $(OBJ_DIR)/%.o: %.c
 	$(call make_dir,$(@D))
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
-$(TEST_DIR)/vm_test_registry$(EXE_EXT): test/vm_test_registry.c $(LIB)
-	$(call make_dir,$(@D))
-	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $< $(LIB) $(LDFLAGS)
 
 $(TEST_DIR)/vm_test_custom_protocol$(EXE_EXT): test/vm_test_custom_protocol.c $(LIB)
 	$(call make_dir,$(@D))
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $< $(LIB) $(LDFLAGS)
 
-$(TEST_DIR)/vm_test_loopback$(EXE_EXT): test/vm_test_loopback.c $(LIB)
-	$(call make_dir,$(@D))
-	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $< $(LIB) $(LDFLAGS)
 
 test: all $(TEST_EXES)
-	$(TEST_DIR)/vm_test_registry$(EXE_EXT)
 	$(TEST_DIR)/vm_test_custom_protocol$(EXE_EXT)
-	$(TEST_DIR)/vm_test_loopback$(EXE_EXT)
 
 clean:
 	$(call remove_dir,$(BUILD_DIR))

@@ -6,7 +6,7 @@
 
 #ifndef VM_CUSTOM_PROTOCOL_H
 #define VM_CUSTOM_PROTOCOL_H
-#include "vm_protocol.h"
+#include "vm_status.h"
 VM_BEGIN
 /* 常量说明：VM_CUSTOM_SOF0 用于配置协议长度、默认参数、缓冲区容量或编译开关。 */
 #define VM_CUSTOM_SOF0 0xAAu

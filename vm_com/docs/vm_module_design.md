@@ -2,50 +2,63 @@
 
 ## 对外接口
 
-对外接口只位于 `include/vm_communication.h`。UI 不直接包含 `private/` 下的传输层、路由层、协议层和值编解码头文件。
+对外接口只位于 `include/vm_communication.h` 和 `include/vm_status.h`。UI 不能直接包含 `src/<layer>/include` 下的内部头文件。当前 COM 对外保留连接、断开、轮询、读取变量、写入变量和事件回调这些业务接口。
 
 ### `vm_comm_create(vm_comm_t **out)`
 
 创建 COM 层通信对象。
 
-- 输入：`out`，通信对象指针的输出地址。
-- 输出：成功时 `*out` 指向新对象。
+- 输入：`out`，通信对象指针输出地址。
+- 输出：成功时 `*out` 指向新对象，默认设备类型为串口，默认串口参数为 115200/8N1。
 - 返回：`VM_OK`、`VM_INVALID`、`VM_NOMEM`。
 
 ### `vm_comm_destroy(vm_comm_t *comm)`
 
-销毁通信对象。函数会先断开设备并清理未完成请求。
+销毁通信对象。函数会先断开设备，释放 Services、PduR、Serial IF、MCAL 串口设备和 pending 请求。
 
-- 输入：`comm`。
-- 输出：无。
+- 输入：`comm`，通信对象。
+- 输出：释放所有由通信对象持有的资源。
+- 返回：无。
 
 ### `vm_comm_set_device_config(vm_comm_t *comm, const vm_comm_device_config_t *config)`
 
-设置设备连接参数。当前可用路径是串口；CAN、CANFD、以太网的配置字段已经保留，底层驱动接入后在模块内部启用。
+设置设备连接参数。
 
-- 输入：通信对象、设备类型、串口端口/波特率、CAN 通道/波特率、网口地址等。
-- 输出：通信对象保存一份配置副本。
+- 输入：通信对象和设备配置。第一阶段只启用串口字段：`serial_device`、`serial_baudrate`、`serial_data_bits`、`serial_stop_bits`、`serial_parity`、`serial_flow_control`。
+- 输出：COM 层保存一份配置副本，避免 UI 字符串释放后悬空。
 - 返回：`VM_OK` 或 `VM_INVALID`。
 
 ### `vm_comm_connect(vm_comm_t *comm)`
 
-按照已设置的设备配置连接设备。
+按照已设置配置搭建通信链路。
 
 - 输入：通信对象。
-- 输出：创建对应传输对象、协议解析器和路由表。
-- 返回：串口成功返回 `VM_OK`；未接入的 CAN/CANFD/以太网返回 `VM_UNSUPPORTED`。
+- 输出：串口路径依次创建 `Serial IF -> 注册默认 MCAL 驱动节点 -> 创建串口设备 -> PduR -> Services -> Custom Service`，并打开串口。
+- 返回：串口成功返回 `VM_OK`；CAN、CANFD、以太网当前返回 `VM_UNSUPPORTED`。
 
 ### `vm_comm_disconnect(vm_comm_t *comm)`
 
-断开设备，释放传输、路由、协议解析器和 pending 请求。
+断开设备并释放内部通信栈对象。
+
+- 输入：通信对象。
+- 输出：销毁 Services、销毁 PduR、注销并关闭串口设备、释放 MCAL 和 IF，清空 pending。
+- 返回：无。
 
 ### `vm_comm_is_connected(const vm_comm_t *comm)`
 
-返回当前连接状态，`1` 表示已连接，`0` 表示未连接。
+查询连接状态。
+
+- 输入：通信对象。
+- 输出：无。
+- 返回：`1` 表示串口 IF 中的当前设备已打开且 Services 已创建；`0` 表示未连接。
 
 ### `vm_comm_set_event_callback(vm_comm_t *comm, vm_comm_event_fn callback, void *context)`
 
-设置 COM 层事件回调。通信模块只在需要 UI 感知时上报事件。
+设置事件回调。
+
+- 输入：通信对象、回调函数和用户上下文。
+- 输出：COM 层保存回调，后续只在需要 UI 感知时上报。
+- 返回：无。
 
 事件类型：
 
@@ -57,50 +70,97 @@
 
 ### `vm_comm_read_variable(vm_comm_t *comm, const vm_comm_variable_t *variable)`
 
-按变量描述发送读请求。
+发送变量读取请求。
 
-- 输入：变量名、类型名、地址、字节数、位字段信息。
-- 输出：无同步数据；响应经 `vm_comm_event_fn` 上报。
+- 输入：通信对象和变量描述，变量描述包含名称、类型名、目标地址、字节数、位字段信息。
+- 输出：请求被登记到 pending 表并通过 Services 发送；响应异步通过事件回调返回。
 - 返回：`VM_OK`、`VM_INVALID`、`VM_BUSY`。
 
 ### `vm_comm_write_variable(...)`
 
-按变量描述和目标文本发送写请求。
+发送变量写入请求。
 
-- 输入：变量描述、十进制目标文本、错误缓冲区。
-- 输出：普通变量直接编码并写入；位字段变量先读当前值，再合并 bit 后写入。
-- 返回：成功发送返回 `VM_OK`；输入非法或范围错误会返回错误码，并通过 `error` 输出中文原因。
+- 输入：通信对象、变量描述、十进制目标文本、错误信息缓冲区。
+- 输出：普通变量直接编码为 MCU 内存字节并发送写请求；位字段变量先读当前存储单元，再合并目标 bit 后发送写请求。
+- 返回：成功发送返回 `VM_OK`；输入非法、范围错误、未连接或发送失败返回对应状态，并尽量通过 `error` 输出中文原因。
 
 ### `vm_comm_poll(vm_comm_t *comm, uint8_t budget)`
 
-由 UI 的定时器调用，用于接收串口数据、拆包、路由和协议处理。
+处理接收链路。
 
-- 输入：本次最多处理的接收轮数。
-- 输出：可能触发事件回调。
-- 返回：`VM_OK`、`VM_BUSY` 或底层接收错误。
+- 输入：通信对象；`budget` 表示本次最多读取并处理多少轮串口缓存。
+- 输出：收到数据后触发 `Serial IF -> PduR -> Services -> Custom Service -> COM`，可能产生 UI 事件回调。
+- 返回：`VM_OK`、`VM_BUSY` 或底层错误。
+
+## 内部公共基础设施
+
+### 侵入式链表：`src/common/include/vm_list.h`
+
+通信模块内所有节点挂接统一使用该链表，包括 IF 层驱动节点、IF 层设备节点和 PduR 服务节点。该文件从 `vm_elf_parser/private/vm_list.h` 拷贝到通信模块内部，链表节点由业务结构体内嵌，链表本身不拥有业务对象，避免每个层级重复实现 `next` 指针链。
+
+- 主要内部接口：`INIT_LIST_HEAD()`、`LIST_ADD_TAIL()`、`LIST_DEL()`、`list_entry()`、`LIST_FOR_EACH_ENTRY()`、`LIST_FOR_EACH_ENTRY_SAFE()`。
+- 输入：链表头、内嵌节点或遍历游标。
+- 输出：节点被挂接、摘除或由节点还原外层结构体。
+- 说明：该头文件只供通信模块内部使用，不安装给 UI。
 
 ## 内部子模块
 
-### COM 层：`src/vm_communication.c`
+### COM 层：`src/com/vm_communication.c`
 
-负责设备配置、连接生命周期、请求上下文、值编解码、位字段读改写、事件上报。COM 层是 UI 唯一入口。
+负责 UI 业务请求汇总、连接生命周期、pending 表、值编解码调度、位字段读改写和事件上报。COM 层调用 Services 总入口、PduR 和 Serial IF 的内部接口，不调用平台串口 API，也不直接创建 custom 协议服务。
 
 ### 值编解码：`src/com/vm_value_codec.c`
 
 根据变量类型名、字节数和位字段信息，将 MCU 内存字节转换为十进制字符串和 double 曲线值，或将 UI 输入的十进制目标值编码为 MCU 内存字节。该接口不对 UI 暴露。
 
-### 协议层：`src/protocol/vm_custom_protocol.c`
+### MCAL 层：`src/mcal/`
 
-负责自定义协议帧的编码、CRC、解码和流式拆包。后续 XCP、UDS 应以同层子模块方式扩展。
+负责平台串口驱动适配。
 
-### PduR 层：`src/route/vm_router.c`
+- `src/mcal/vm_mcal_serial.c`：平台无关公共逻辑，包括配置校验、设备初始化和统一 open/read/write 包装。
+- `src/mcal/windows/vm_windows_serial.c`：Windows 串口驱动节点，使用 Win32 串口 API。
+- `src/mcal/posix/vm_posix_serial.c`：POSIX 串口驱动节点，使用 termios 和非阻塞 fd。
+- 主要内部接口：`vm_mcal_serial_device_configure()`、`vm_mcal_serial_open()`、`vm_mcal_serial_close()`、`vm_mcal_serial_read()`、`vm_mcal_serial_write()`、`vm_mcal_serial_windows_driver_get()`、`vm_mcal_serial_posix_driver_get()`。
 
-根据路由表把传输层收到的帧转给协议层，也把协议层发出的帧转给对应传输通道。
+### IF 层：`src/if/vm_serial_if.c`
 
-### TP/IF 层：`src/transport/`
+负责串口驱动节点挂接和设备管理。
 
-串口传输负责打开、关闭、发送和非阻塞接收。loopback 传输用于模块测试。
+- 主要内部接口：`vm_serial_if_register_driver()`、`vm_serial_if_register_default_drivers()`、`vm_serial_if_create_device()`、`vm_serial_if_register_device()`、`vm_serial_if_open()`、`vm_serial_if_read()`、`vm_serial_if_write()`。
+- 输入：MCAL 驱动节点、串口配置、MCAL 串口设备、设备名称、读写缓冲区。驱动节点和设备节点都通过 `vm_list` 挂接。
+- 输出：统一的串口设备对象和读写状态。
+- 说明：上层模块最多调用到 IF 层，不向上暴露 MCAL 细节。
 
-### MCAL/驱动层：`src/driver/`
+### PduR 层：`src/pdur/vm_pdur.c`
 
-当前保留 CAN 适配占位，厂商库放在 `driver/vendor/`。后续接入时不得绕过 COM 层暴露给 UI。
+负责路由下层 PDU 和服务输出。
+
+- 主要内部接口：`vm_pdur_register_service()`、`vm_pdur_input()`、`vm_pdur_output()`。
+- 输入：`vm_pdur_context_t`，包含设备类型、服务 ID、下层句柄和收发数据。服务节点通过 `vm_list` 挂接。
+- 输出：匹配服务被调用，或数据写回下层 IF/TP。
+- 说明：串口当前直接路由到 Serial IF；CAN/CANFD 后续在 TP 层接入后再路由。
+
+### Services 层：`src/services/vm_service.c`
+
+负责协议服务抽象和挂接。
+
+- 主要内部接口：`vm_service_manager_create()`、`vm_service_manager_destroy()`、`vm_service_custom_read()`、`vm_service_custom_write()`。
+- 输入：PduR 控制块、下层 IF/设备、协议请求参数。
+- 输出：已编码请求通过 PduR 发送；收到完整协议消息后回调 COM。
+- 说明：后续 XCP、UDS 在 Services 层新增子服务，COM 层不直接调用具体协议服务。
+
+### 自定义协议服务：`src/services/custom/vm_custom_service.c`
+
+负责把自定义变量监控协议挂到 Services/PduR。
+
+- 主要内部接口：`vm_custom_service_create()`、`vm_custom_service_send_read()`、`vm_custom_service_send_write()`。
+- 输入：PduR 控制块、下层 IF/设备、请求序号、地址、长度或负载。
+- 输出：协议帧经 PduR 发出；接收方向解析出完整消息后回调 Services/COM。
+
+### 自定义协议帧：`src/services/custom/vm_custom_protocol.c`
+
+负责自定义协议帧编码、CRC、解码和流式拆包。
+
+- 输入：请求序号、目标地址、数据长度、负载字节，或下层收到的原始字节流。
+- 输出：完整协议帧，或解析完成的 `vm_custom_message_t`。
+- 说明：协议帧模块只处理帧格式，不直接读写设备。
