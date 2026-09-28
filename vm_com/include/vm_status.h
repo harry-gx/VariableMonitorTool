@@ -1,3 +1,9 @@
+/*
+ * 文件说明：通信模块统一状态码和 C/C++ 兼容宏定义。
+ * 所属模块：通信模块。
+ * 设计要点：正式业务逻辑集中在本文件或本模块内，测试代码位于 test 目录，第三方厂商头文件不在本次注释范围内。
+ */
+
 #ifndef VM_STATUS_H
 #define VM_STATUS_H
 #include <stddef.h>
@@ -11,6 +17,7 @@
 #define VM_BEGIN
 #define VM_END
 #endif
+/* 类型说明：枚举限定模块状态、事件或设备类型的取值范围。 */
 typedef enum
 {
     VM_OK = 0,

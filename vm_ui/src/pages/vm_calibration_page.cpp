@@ -1,8 +1,15 @@
+/*
+ * 文件说明：UI 界面模块Qt/C++ 实现文件。
+ * 所属模块：UI 界面模块。
+ * 设计要点：正式业务逻辑集中在本文件或本模块内，测试代码位于 test 目录，第三方厂商头文件不在本次注释范围内。
+ */
+
 #include "pages/vm_calibration_page.h"
 
 #include <QtWidgets>
 
 
+// 类型说明：枚举限定模块状态、事件或设备类型的取值范围。
 enum CalibrationRoles {
     CalibrationRoleAddress = Qt::UserRole + 1,
     CalibrationRoleSize,
@@ -17,12 +24,20 @@ enum CalibrationRoles {
     CalibrationRoleRawData
 };
 
+// 函数说明：addressFromText，执行本模块对应功能逻辑。
+// 输入：text：文本内容或输入字符串。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 static quint32 addressFromText(const QString &text) {
     bool ok = false;
     const quint64 value = text.toULongLong(&ok, 16);
     return ok ? static_cast<quint32>(value) : 0;
 }
 
+// 函数说明：QWidget，执行本模块对应功能逻辑。
+// 输入：parent：Qt 父对象指针。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回对象指针或缓冲区指针，返回 NULL 表示未找到或失败。
 CalibrationPage::CalibrationPage(QWidget *parent) : QWidget(parent) {
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(6, 6, 6, 6);
@@ -75,6 +90,10 @@ CalibrationPage::CalibrationPage(QWidget *parent) : QWidget(parent) {
     });
 }
 
+// 函数说明：CalibrationPage::setReady，读取数据或发起读取请求。
+// 输入：ready：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void CalibrationPage::setReady(bool ready) {
     ready_ = ready;
     const bool hasRows = table_->rowCount() > 0;
@@ -87,14 +106,26 @@ void CalibrationPage::setReady(bool ready) {
     }
 }
 
+// 函数说明：CalibrationPage::setCalibrateRowCallback，处理回调事件并更新相关状态。
+// 输入：callback：事件回调函数指针。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void CalibrationPage::setCalibrateRowCallback(std::function<void(int)> callback) {
     calibrateRowCallback_ = std::move(callback);
 }
 
+// 函数说明：CalibrationPage::setCalibrateAllCallback，处理回调事件并更新相关状态。
+// 输入：callback：事件回调函数指针。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void CalibrationPage::setCalibrateAllCallback(std::function<void()> callback) {
     calibrateAllCallback_ = std::move(callback);
 }
 
+// 函数说明：CalibrationPage::setRows，执行本模块对应功能逻辑。
+// 输入：variables：函数输入参数，参与本函数的计算、查找或状态更新。；targets：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void CalibrationPage::setRows(const QVector<UiVariable> &variables, const QMap<QString, QString> &targets) {
     const QString selectedKey = keyAt(currentRow());
     QSignalBlocker blocker(table_);
@@ -164,6 +195,10 @@ void CalibrationPage::setRows(const QVector<UiVariable> &variables, const QMap<Q
     setReady(ready_);
 }
 
+// 函数说明：CalibrationPage::collectTargets，执行本模块对应功能逻辑。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 QMap<QString, QString> CalibrationPage::collectTargets() const {
     QMap<QString, QString> targets;
     for (int row = 0; row < table_->rowCount(); ++row) {
@@ -176,6 +211,10 @@ QMap<QString, QString> CalibrationPage::collectTargets() const {
     return targets;
 }
 
+// 函数说明：CalibrationPage::updateValue，刷新界面数据或内部状态。
+// 输入：address：函数输入参数，参与本函数的计算、查找或状态更新。；size：数据长度或缓冲区容量。；value：函数输入参数，参与本函数的计算、查找或状态更新。；status：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void CalibrationPage::updateValue(quint32 address,
                                   quint16 size,
                                   const QString &value,
@@ -222,47 +261,83 @@ void CalibrationPage::updateValue(quint32 address,
 int CalibrationPage::rowCount() const { return table_->rowCount(); }
 int CalibrationPage::currentRow() const { return table_->currentRow(); }
 
+// 函数说明：CalibrationPage::addressAt，执行本模块对应功能逻辑。
+// 输入：row：界面表格行号。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 quint32 CalibrationPage::addressAt(int row) const {
     auto *item = table_->item(row, 0);
     return item ? addressFromText(item->data(CalibrationRoleAddress).toString()) : 0;
 }
 
+// 函数说明：CalibrationPage::sizeAt，执行本模块对应功能逻辑。
+// 输入：row：界面表格行号。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 quint16 CalibrationPage::sizeAt(int row) const {
     auto *item = table_->item(row, 0);
     return item ? static_cast<quint16>(item->data(CalibrationRoleSize).toString().toUShort()) : 0;
 }
 
+// 函数说明：CalibrationPage::nameAt，执行本模块对应功能逻辑。
+// 输入：row：界面表格行号。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 Qt 字符串结果。
 QString CalibrationPage::nameAt(int row) const {
     auto *item = table_->item(row, 0);
     return item ? item->text() : QString();
 }
 
+// 函数说明：CalibrationPage::typeNameAt，执行本模块对应功能逻辑。
+// 输入：row：界面表格行号。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 Qt 字符串结果。
 QString CalibrationPage::typeNameAt(int row) const {
     auto *item = table_->item(row, 0);
     return item ? item->data(CalibrationRoleTypeName).toString() : QString();
 }
 
+// 函数说明：CalibrationPage::bitFieldAt，执行本模块对应功能逻辑。
+// 输入：row：界面表格行号。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 true 表示成功或条件成立，返回 false 表示失败或条件不成立。
 bool CalibrationPage::bitFieldAt(int row) const {
     auto *item = table_->item(row, 0);
     return item ? item->data(CalibrationRoleBitField).toBool() : false;
 }
 
+// 函数说明：CalibrationPage::bitOffsetAt，执行本模块对应功能逻辑。
+// 输入：row：界面表格行号。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 quint8 CalibrationPage::bitOffsetAt(int row) const {
     auto *item = table_->item(row, 0);
     return item ? static_cast<quint8>(item->data(CalibrationRoleBitOffset).toUInt()) : 0;
 }
 
+// 函数说明：CalibrationPage::bitSizeAt，执行本模块对应功能逻辑。
+// 输入：row：界面表格行号。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 quint8 CalibrationPage::bitSizeAt(int row) const {
     auto *item = table_->item(row, 0);
     return item ? static_cast<quint8>(item->data(CalibrationRoleBitSize).toUInt()) : 0;
 }
 
 
+// 函数说明：CalibrationPage::targetTextAt，执行本模块对应功能逻辑。
+// 输入：row：界面表格行号。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 Qt 字符串结果。
 QString CalibrationPage::targetTextAt(int row) const {
     auto *item = table_->item(row, 2);
     return item ? item->text() : QString();
 }
 
+// 函数说明：CalibrationPage::variableAt，执行本模块对应功能逻辑。
+// 输入：row：界面表格行号。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 UiVariable CalibrationPage::variableAt(int row) const {
     auto *item = table_->item(row, 0);
     if (!item) {
@@ -279,6 +354,10 @@ UiVariable CalibrationPage::variableAt(int row) const {
                       static_cast<quint8>(item->data(CalibrationRoleBitSize).toUInt()));
 }
 
+// 函数说明：CalibrationPage::keyAt，执行本模块对应功能逻辑。
+// 输入：row：界面表格行号。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 Qt 字符串结果。
 QString CalibrationPage::keyAt(int row) const {
     auto *item = table_->item(row, 0);
     return item ? item->data(CalibrationRoleKey).toString() : QString();

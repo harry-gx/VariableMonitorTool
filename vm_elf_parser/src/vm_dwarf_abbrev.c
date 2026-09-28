@@ -1,7 +1,19 @@
+/*
+ * 文件说明：DWARF abbrev 表解析实现。
+ * 所属模块：ELF/AXF 解析模块。
+ * 设计要点：正式业务逻辑集中在本文件或本模块内，测试代码位于 test 目录，第三方厂商头文件不在本次注释范围内。
+ */
+
 #include "../private/vm_dwarf_internal.h"
 #include <stdlib.h>
 #include <string.h>
 
+/**
+ * 函数说明：dw_uint，执行本模块对应功能逻辑。
+ * 输入：c：函数输入参数，参与本函数的计算、查找或状态更新。；width：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t dw_uint(dw_cursor *c, unsigned width, uint64_t *out)
 {
     vm_status_t s = vm_read_uint(&c->reader, c->pos, width, out);
@@ -12,6 +24,12 @@ vm_status_t dw_uint(dw_cursor *c, unsigned width, uint64_t *out)
     return s;
 }
 
+/**
+ * 函数说明：dw_uleb，执行本模块对应功能逻辑。
+ * 输入：c：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t dw_uleb(dw_cursor *c, uint64_t *out)
 {
     uint64_t value = 0;
@@ -37,6 +55,12 @@ vm_status_t dw_uleb(dw_cursor *c, uint64_t *out)
     return VM_FORMAT;
 }
 
+/**
+ * 函数说明：dw_sleb，执行本模块对应功能逻辑。
+ * 输入：c：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t dw_sleb(dw_cursor *c, int64_t *out)
 {
     uint64_t value = 0;
@@ -70,6 +94,12 @@ vm_status_t dw_sleb(dw_cursor *c, int64_t *out)
     return VM_FORMAT;
 }
 
+/**
+ * 函数说明：grow，执行本模块对应功能逻辑。
+ * 输入：p：函数输入参数，参与本函数的计算、查找或状态更新。；capacity：函数输入参数，参与本函数的计算、查找或状态更新。；count：函数输入参数，参与本函数的计算、查找或状态更新。；width：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t
 grow(void *p, size_t *capacity, size_t count, size_t width, void **out)
 {
@@ -95,6 +125,12 @@ grow(void *p, size_t *capacity, size_t count, size_t width, void **out)
     return VM_OK;
 }
 
+/**
+ * 函数说明：dw_table_free，执行本模块对应功能逻辑。
+ * 输入：t：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：无返回值。
+ */
 void dw_table_free(dw_table *t)
 {
     free(t->entries);
@@ -102,6 +138,12 @@ void dw_table_free(dw_table *t)
     memset(t, 0, sizeof(*t));
 }
 
+/**
+ * 函数说明：by_code，执行本模块对应功能逻辑。
+ * 输入：a：函数输入参数，参与本函数的计算、查找或状态更新。；b：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回整数结果，具体含义由调用场景决定。
+ */
 static int by_code(const void *a, const void *b)
 {
     uint64_t x = ((const dw_abbrev *)a)->view.code;
@@ -109,6 +151,12 @@ static int by_code(const void *a, const void *b)
     return (x > y) - (x < y);
 }
 
+/**
+ * 函数说明：dw_table_read，读取数据或发起读取请求。
+ * 输入：bytes：函数输入参数，参与本函数的计算、查找或状态更新。；size：数据长度或缓冲区容量。；offset：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。；error_offset：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t dw_table_read(const void *bytes,
                           size_t size,
                           size_t offset,
@@ -223,6 +271,12 @@ fail:
     return s;
 }
 
+/**
+ * 函数说明：dw_table_find，查找匹配对象。
+ * 输入：t：函数输入参数，参与本函数的计算、查找或状态更新。；code：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回执行结果，具体含义由调用方按接口约定解释。
+ */
 const dw_abbrev *dw_table_find(const dw_table *t, uint64_t code)
 {
     size_t i;
@@ -236,6 +290,12 @@ const dw_abbrev *dw_table_find(const dw_table *t, uint64_t code)
     return NULL;
 }
 
+/**
+ * 函数说明：vm_dwarf_abbrev_at_offset，执行本模块对应功能逻辑。
+ * 输入：bytes：函数输入参数，参与本函数的计算、查找或状态更新。；size：数据长度或缓冲区容量。；offset：函数输入参数，参与本函数的计算、查找或状态更新。；index：列表索引或数组下标。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_dwarf_abbrev_at_offset(const void *bytes,
                                       size_t size,
                                       size_t offset,
@@ -262,6 +322,12 @@ vm_status_t vm_dwarf_abbrev_at_offset(const void *bytes,
     return s;
 }
 
+/**
+ * 函数说明：vm_dwarf_abbrev_at，执行本模块对应功能逻辑。
+ * 输入：bytes：函数输入参数，参与本函数的计算、查找或状态更新。；size：数据长度或缓冲区容量。；index：列表索引或数组下标。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_dwarf_abbrev_at(const void *bytes,
                                size_t size,
                                size_t index,
@@ -270,6 +336,12 @@ vm_status_t vm_dwarf_abbrev_at(const void *bytes,
     return vm_dwarf_abbrev_at_offset(bytes, size, 0, index, out);
 }
 
+/**
+ * 函数说明：vm_dwarf_abbrev_count_checked，执行本模块对应功能逻辑。
+ * 输入：bytes：函数输入参数，参与本函数的计算、查找或状态更新。；size：数据长度或缓冲区容量。；offset：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_dwarf_abbrev_count_checked(const void *bytes,
                                           size_t size,
                                           size_t offset,
@@ -289,17 +361,35 @@ vm_status_t vm_dwarf_abbrev_count_checked(const void *bytes,
     dw_table_free(&t);
     return s;
 }
+/**
+ * 函数说明：vm_dwarf_abbrev_count_at，执行本模块对应功能逻辑。
+ * 输入：bytes：函数输入参数，参与本函数的计算、查找或状态更新。；size：数据长度或缓冲区容量。；offset：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回数量、长度或索引值。
+ */
 size_t vm_dwarf_abbrev_count_at(const void *bytes, size_t size, size_t offset)
 {
     size_t n = 0;
     (void)vm_dwarf_abbrev_count_checked(bytes, size, offset, &n);
     return n;
 }
+/**
+ * 函数说明：vm_dwarf_abbrev_count，执行本模块对应功能逻辑。
+ * 输入：bytes：函数输入参数，参与本函数的计算、查找或状态更新。；size：数据长度或缓冲区容量。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回数量、长度或索引值。
+ */
 size_t vm_dwarf_abbrev_count(const void *bytes, size_t size)
 {
     return vm_dwarf_abbrev_count_at(bytes, size, 0);
 }
 
+/**
+ * 函数说明：vm_dwarf_abbrev_attr_at，执行本模块对应功能逻辑。
+ * 输入：bytes：函数输入参数，参与本函数的计算、查找或状态更新。；size：数据长度或缓冲区容量。；offset：函数输入参数，参与本函数的计算、查找或状态更新。；index：列表索引或数组下标。；attr：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_dwarf_abbrev_attr_at(const void *bytes,
                                     size_t size,
                                     size_t offset,
@@ -328,6 +418,12 @@ vm_status_t vm_dwarf_abbrev_attr_at(const void *bytes,
     return s;
 }
 
+/**
+ * 函数说明：vm_dwarf_die_header，执行本模块对应功能逻辑。
+ * 输入：bytes：函数输入参数，参与本函数的计算、查找或状态更新。；size：数据长度或缓冲区容量。；offset：函数输入参数，参与本函数的计算、查找或状态更新。；abbrev：函数输入参数，参与本函数的计算、查找或状态更新。；abbrev_size：函数输入参数，参与本函数的计算、查找或状态更新。；abbrev_offset：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_dwarf_die_header(const void *bytes,
                                 size_t size,
                                 size_t offset,

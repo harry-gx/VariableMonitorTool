@@ -1,3 +1,9 @@
+/*
+ * 文件说明：UI 界面模块Qt/C++ 实现文件。
+ * 所属模块：UI 界面模块。
+ * 设计要点：正式业务逻辑集中在本文件或本模块内，测试代码位于 test 目录，第三方厂商头文件不在本次注释范围内。
+ */
+
 #include "pages/vm_device_page.h"
 
 #include <QComboBox>
@@ -11,6 +17,10 @@
 #include <QStackedWidget>
 #include <QVBoxLayout>
 
+// 函数说明：wrapForm，执行本模块对应功能逻辑。
+// 输入：title：函数输入参数，参与本函数的计算、查找或状态更新。；form：函数输入参数，参与本函数的计算、查找或状态更新。；parent：Qt 父对象指针。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 static QWidget *wrapForm(const QString &title, QFormLayout *form, QWidget *parent) {
     auto *group = new QGroupBox(title, parent);
     group->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
@@ -19,10 +29,18 @@ static QWidget *wrapForm(const QString &title, QFormLayout *form, QWidget *paren
     return group;
 }
 
+// 函数说明：addBaudRateItem，执行本模块对应功能逻辑。
+// 输入：box：函数输入参数，参与本函数的计算、查找或状态更新。；text：文本内容或输入字符串。；value：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 static void addBaudRateItem(QComboBox *box, const QString &text, unsigned value) {
     box->addItem(text, value);
 }
 
+// 函数说明：addStandardCanBaudRates，执行本模块对应功能逻辑。
+// 输入：box：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 static void addStandardCanBaudRates(QComboBox *box) {
     addBaudRateItem(box, QStringLiteral("125 kbps"), 125000);
     addBaudRateItem(box, QStringLiteral("250 kbps"), 250000);
@@ -31,6 +49,10 @@ static void addStandardCanBaudRates(QComboBox *box) {
     box->setCurrentIndex(box->findData(500000));
 }
 
+// 函数说明：addCanChannels，执行本模块对应功能逻辑。
+// 输入：box：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 static void addCanChannels(QComboBox *box) {
     box->addItems(QStringList() << QStringLiteral("0")
                                 << QStringLiteral("1")
@@ -38,6 +60,10 @@ static void addCanChannels(QComboBox *box) {
                                 << QStringLiteral("3"));
 }
 
+// 函数说明：addCanAdapters，执行本模块对应功能逻辑。
+// 输入：box：函数输入参数，参与本函数的计算、查找或状态更新。；canFd：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 static void addCanAdapters(QComboBox *box, bool canFd) {
     if (!canFd) {
         box->addItem(QStringLiteral("广成科技 CAN 卡"), QStringLiteral("gc"));
@@ -47,6 +73,10 @@ static void addCanAdapters(QComboBox *box, bool canFd) {
                  QStringLiteral("zlg"));
 }
 
+// 函数说明：setComboByNumericData，执行本模块对应功能逻辑。
+// 输入：box：函数输入参数，参与本函数的计算、查找或状态更新。；valueText：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 static void setComboByNumericData(QComboBox *box, const QString &valueText) {
     bool ok = false;
     const unsigned value = valueText.toUInt(&ok);
@@ -60,6 +90,10 @@ static void setComboByNumericData(QComboBox *box, const QString &valueText) {
     box->setCurrentText(valueText);
 }
 
+// 函数说明：QWidget，执行本模块对应功能逻辑。
+// 输入：parent：Qt 父对象指针。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回对象指针或缓冲区指针，返回 NULL 表示未找到或失败。
 DevicePage::DevicePage(QWidget *parent) : QWidget(parent) {
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(12, 12, 12, 12);
@@ -160,6 +194,10 @@ DevicePage::DevicePage(QWidget *parent) : QWidget(parent) {
 QPushButton *DevicePage::refreshButton() const { return refreshButton_; }
 QPushButton *DevicePage::connectButton() const { return connectButton_; }
 
+// 函数说明：DevicePage::refreshPorts，刷新显示或使能状态。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void DevicePage::refreshPorts() {
     if (deviceType() != UiDeviceType::Serial) {
         return;
@@ -177,6 +215,10 @@ void DevicePage::refreshPorts() {
     }
 }
 
+// 函数说明：DevicePage::setConnected，建立连接并准备收发链路。
+// 输入：connected：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void DevicePage::setConnected(bool connected) {
     deviceType_->setEnabled(!connected);
     deviceStack_->setEnabled(!connected);
@@ -184,6 +226,10 @@ void DevicePage::setConnected(bool connected) {
     connectButton_->setText(connected ? QStringLiteral("断开设备") : QStringLiteral("连接设备"));
 }
 
+// 函数说明：DevicePage::setDeviceType，执行本模块对应功能逻辑。
+// 输入：type：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void DevicePage::setDeviceType(UiDeviceType type) {
     const int index = deviceType_->findData(static_cast<int>(type));
     if (index >= 0) {
@@ -191,6 +237,10 @@ void DevicePage::setDeviceType(UiDeviceType type) {
     }
 }
 
+// 函数说明：DevicePage::setPortName，执行本模块对应功能逻辑。
+// 输入：portName：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void DevicePage::setPortName(const QString &portName) {
     const int index = ports_->findData(portName);
     if (index >= 0) {
@@ -198,10 +248,18 @@ void DevicePage::setPortName(const QString &portName) {
     }
 }
 
+// 函数说明：DevicePage::setBaudRate，执行本模块对应功能逻辑。
+// 输入：baudRate：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void DevicePage::setBaudRate(const QString &baudRate) {
     baud_->setCurrentText(baudRate);
 }
 
+// 函数说明：DevicePage::setCanAdapter，执行本模块对应功能逻辑。
+// 输入：adapter：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void DevicePage::setCanAdapter(const QString &adapter) {
     const int canIndex = canAdapter_->findData(adapter);
     if (canIndex >= 0) {
@@ -213,66 +271,122 @@ void DevicePage::setCanAdapter(const QString &adapter) {
     }
 }
 
+// 函数说明：DevicePage::setCanChannel，执行本模块对应功能逻辑。
+// 输入：channel：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void DevicePage::setCanChannel(const QString &channel) {
     canChannel_->setCurrentText(channel);
     canFdChannel_->setCurrentText(channel);
 }
 
+// 函数说明：DevicePage::setCanBaudRate，执行本模块对应功能逻辑。
+// 输入：baudRate：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void DevicePage::setCanBaudRate(const QString &baudRate) {
     setComboByNumericData(canBaud_, baudRate);
     setComboByNumericData(canFdBaud_, baudRate);
 }
 
+// 函数说明：DevicePage::setCanFdDataBaudRate，执行本模块对应功能逻辑。
+// 输入：baudRate：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void DevicePage::setCanFdDataBaudRate(const QString &baudRate) {
     setComboByNumericData(canFdDataBaud_, baudRate);
 }
 
+// 函数说明：DevicePage::setNetworkHost，执行本模块对应功能逻辑。
+// 输入：host：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void DevicePage::setNetworkHost(const QString &host) {
     networkHost_->setText(host);
 }
 
+// 函数说明：DevicePage::setNetworkPort，执行本模块对应功能逻辑。
+// 输入：port：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void DevicePage::setNetworkPort(const QString &port) {
     networkPort_->setText(port);
 }
 
+// 函数说明：DevicePage::deviceType，执行本模块对应功能逻辑。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 UiDeviceType DevicePage::deviceType() const {
     return static_cast<UiDeviceType>(deviceType_->currentData().toInt());
 }
 
+// 函数说明：DevicePage::portName，执行本模块对应功能逻辑。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 Qt 字符串结果。
 QString DevicePage::portName() const {
     return ports_->currentData().toString();
 }
 
+// 函数说明：DevicePage::baudRate，执行本模块对应功能逻辑。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 unsigned DevicePage::baudRate() const {
     return baud_->currentText().toUInt();
 }
 
+// 函数说明：DevicePage::canAdapter，执行本模块对应功能逻辑。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 Qt 字符串结果。
 QString DevicePage::canAdapter() const {
     return deviceType() == UiDeviceType::CanFd
         ? canFdAdapter_->currentData().toString()
         : canAdapter_->currentData().toString();
 }
 
+// 函数说明：DevicePage::canChannel，执行本模块对应功能逻辑。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 Qt 字符串结果。
 QString DevicePage::canChannel() const {
     return deviceType() == UiDeviceType::CanFd
         ? canFdChannel_->currentText()
         : canChannel_->currentText();
 }
 
+// 函数说明：DevicePage::canBaudRate，执行本模块对应功能逻辑。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 unsigned DevicePage::canBaudRate() const {
     return deviceType() == UiDeviceType::CanFd
         ? canFdBaud_->currentData().toUInt()
         : canBaud_->currentData().toUInt();
 }
 
+// 函数说明：DevicePage::canFdDataBaudRate，执行本模块对应功能逻辑。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 unsigned DevicePage::canFdDataBaudRate() const {
     return canFdDataBaud_->currentData().toUInt();
 }
 
+// 函数说明：DevicePage::networkHost，执行本模块对应功能逻辑。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 Qt 字符串结果。
 QString DevicePage::networkHost() const {
     return networkHost_->text();
 }
 
+// 函数说明：DevicePage::networkPort，执行本模块对应功能逻辑。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 unsigned DevicePage::networkPort() const {
     return networkPort_->text().toUInt();
 }

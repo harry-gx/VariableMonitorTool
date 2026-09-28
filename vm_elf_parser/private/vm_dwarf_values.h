@@ -1,3 +1,9 @@
+/*
+ * 文件说明：ELF/AXF 解析模块内部接口声明，供模块内部源文件使用。
+ * 所属模块：ELF/AXF 解析模块。
+ * 设计要点：正式业务逻辑集中在本文件或本模块内，测试代码位于 test 目录，第三方厂商头文件不在本次注释范围内。
+ */
+
 #ifndef VM_DWARF_VALUES_H
 #define VM_DWARF_VALUES_H
 /* DWARF 2-5 standard encodings used by this reader. */

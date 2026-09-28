@@ -1,6 +1,18 @@
+/*
+ * 文件说明：DWARF 属性 form 解码实现。
+ * 所属模块：ELF/AXF 解析模块。
+ * 设计要点：正式业务逻辑集中在本文件或本模块内，测试代码位于 test 目录，第三方厂商头文件不在本次注释范围内。
+ */
+
 #include "../private/vm_dwarf_internal.h"
 #include <string.h>
 
+/**
+ * 函数说明：vm_dwarf_form_read，读取数据或发起读取请求。
+ * 输入：bytes：函数输入参数，参与本函数的计算、查找或状态更新。；size：数据长度或缓冲区容量。；offset：函数输入参数，参与本函数的计算、查找或状态更新。；form：函数输入参数，参与本函数的计算、查找或状态更新。；ctx：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。；next：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_dwarf_form_read(const void *bytes,
                                size_t size,
                                size_t offset,
@@ -192,6 +204,12 @@ vm_status_t vm_dwarf_form_read(const void *bytes,
     return VM_OK;
 }
 
+/**
+ * 函数说明：vm_dwarf_form_skip，执行本模块对应功能逻辑。
+ * 输入：bytes：函数输入参数，参与本函数的计算、查找或状态更新。；size：数据长度或缓冲区容量。；offset：函数输入参数，参与本函数的计算、查找或状态更新。；form：函数输入参数，参与本函数的计算、查找或状态更新。；address_size：函数输入参数，参与本函数的计算、查找或状态更新。；next：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_dwarf_form_skip(const void *bytes,
                                size_t size,
                                size_t offset,
@@ -205,6 +223,12 @@ vm_status_t vm_dwarf_form_skip(const void *bytes,
     return vm_dwarf_form_read(bytes, size, offset, form, &ctx, &value, next);
 }
 
+/**
+ * 函数说明：vm_dwarf_location_address，执行本模块对应功能逻辑。
+ * 输入：v：函数输入参数，参与本函数的计算、查找或状态更新。；address_size：函数输入参数，参与本函数的计算、查找或状态更新。；big_endian：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_dwarf_location_address(const vm_dwarf_value_t *v,
                                       uint8_t address_size,
                                       int big_endian,
@@ -227,6 +251,12 @@ vm_status_t vm_dwarf_location_address(const vm_dwarf_value_t *v,
     return vm_read_uint(&r, 1, address_size, out);
 }
 
+/**
+ * 函数说明：vm_dwarf_member_offset，执行本模块对应功能逻辑。
+ * 输入：v：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_dwarf_member_offset(const vm_dwarf_value_t *v, uint64_t *out)
 {
     dw_cursor c;

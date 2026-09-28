@@ -1,9 +1,19 @@
+/*
+ * 文件说明：UI 到 C 模块的适配层实现，隔离 Qt 类型和 C 模块接口。
+ * 所属模块：UI 界面模块。
+ * 设计要点：正式业务逻辑集中在本文件或本模块内，测试代码位于 test 目录，第三方厂商头文件不在本次注释范围内。
+ */
+
 #include "vm_ui_port.h"
 
 #include <QByteArray>
 
 #include "vm_monitor_variables.h"
 
+// 函数说明：addressFromText，执行本模块对应功能逻辑。
+// 输入：text：文本内容或输入字符串。；ok：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 static quint32 addressFromText(const QString &text, bool &ok) {
     QString trimmed = text.trimmed();
     int base = 10;
@@ -15,23 +25,43 @@ static quint32 addressFromText(const QString &text, bool &ok) {
     return ok ? static_cast<quint32>(value) : 0u;
 }
 
+// 函数说明：MonitorFacade::MonitorFacade，执行本模块对应功能逻辑。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 MonitorFacade::MonitorFacade() {
     vm_comm_create(&client_);
 }
 
+// 函数说明：MonitorFacade::~MonitorFacade，执行本模块对应功能逻辑。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 MonitorFacade::~MonitorFacade() {
     vm_comm_destroy(client_);
     client_ = nullptr;
 }
 
+// 函数说明：MonitorFacade::connected，建立连接并准备收发链路。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 true 表示成功或条件成立，返回 false 表示失败或条件不成立。
 bool MonitorFacade::connected() const {
     return vm_comm_is_connected(client_) != 0u;
 }
 
+// 函数说明：MonitorFacade::disconnectPort，建立连接并准备收发链路。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MonitorFacade::disconnectPort() {
     vm_comm_disconnect(client_);
 }
 
+// 函数说明：MonitorFacade::connectPort，建立连接并准备收发链路。
+// 输入：port：函数输入参数，参与本函数的计算、查找或状态更新。；baud：函数输入参数，参与本函数的计算、查找或状态更新。；error：错误信息输出缓冲区。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 true 表示成功或条件成立，返回 false 表示失败或条件不成立。
 bool MonitorFacade::connectPort(const QString &port, unsigned baud, QString &error) {
     MonitorDeviceConfig config;
     config.type = MonitorDeviceType::Serial;
@@ -40,6 +70,10 @@ bool MonitorFacade::connectPort(const QString &port, unsigned baud, QString &err
     return connectDevice(config, error);
 }
 
+// 函数说明：MonitorFacade::connectDevice，建立连接并准备收发链路。
+// 输入：config：设备连接参数或模块初始化参数。；error：错误信息输出缓冲区。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 true 表示成功或条件成立，返回 false 表示失败或条件不成立。
 bool MonitorFacade::connectDevice(const MonitorDeviceConfig &config, QString &error) {
     if (!client_) {
         error = QStringLiteral("通信模块创建失败");
@@ -101,14 +135,23 @@ bool MonitorFacade::connectDevice(const MonitorDeviceConfig &config, QString &er
         return false;
     }
 
+    // 关键步骤：连接成功后注册 C 回调，让通信模块把读值、写确认和错误统一推送回 UI。
     vm_comm_set_event_callback(client_, &MonitorFacade::onEvent, this);
     return true;
 }
 
+// 函数说明：MonitorFacade::setResponseCallback，处理回调事件并更新相关状态。
+// 输入：callback：事件回调函数指针。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MonitorFacade::setResponseCallback(std::function<void(const MonitorCommEvent &)> callback) {
     responseCallback_ = std::move(callback);
 }
 
+// 函数说明：MonitorFacade::fillCommVariable，执行本模块对应功能逻辑。
+// 输入：variable：变量描述信息，包含变量名、类型、地址、长度和权限。；out：输出对象或结果指针，函数成功时写入有效值。；name：函数输入参数，参与本函数的计算、查找或状态更新。；typeName：函数输入参数，参与本函数的计算、查找或状态更新。；error：错误信息输出缓冲区。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 true 表示成功或条件成立，返回 false 表示失败或条件不成立。
 bool MonitorFacade::fillCommVariable(const UiVariable &variable,
                                       vm_comm_variable_t &out,
                                       QByteArray &name,
@@ -143,6 +186,10 @@ bool MonitorFacade::fillCommVariable(const UiVariable &variable,
     return true;
 }
 
+// 函数说明：MonitorFacade::readVariable，读取数据或发起读取请求。
+// 输入：variable：变量描述信息，包含变量名、类型、地址、长度和权限。；error：错误信息输出缓冲区。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 true 表示成功或条件成立，返回 false 表示失败或条件不成立。
 bool MonitorFacade::readVariable(const UiVariable &variable, QString &error) {
     if (!client_ || !connected()) {
         error = QStringLiteral("设备未连接");
@@ -164,6 +211,10 @@ bool MonitorFacade::readVariable(const UiVariable &variable, QString &error) {
     return true;
 }
 
+// 函数说明：MonitorFacade::writeVariable，写入数据或发起标定请求。
+// 输入：variable：变量描述信息，包含变量名、类型、地址、长度和权限。；target：函数输入参数，参与本函数的计算、查找或状态更新。；error：错误信息输出缓冲区。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 true 表示成功或条件成立，返回 false 表示失败或条件不成立。
 bool MonitorFacade::writeVariable(const UiVariable &variable, const QString &target, QString &error) {
     if (!client_ || !connected()) {
         error = QStringLiteral("设备未连接");
@@ -191,6 +242,10 @@ bool MonitorFacade::writeVariable(const UiVariable &variable, const QString &tar
     return true;
 }
 
+// 函数说明：MonitorFacade::poll，轮询处理异步收发事件。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MonitorFacade::poll() {
     if (!client_ || !connected()) {
         return;
@@ -199,6 +254,10 @@ void MonitorFacade::poll() {
     (void)vm_comm_poll(client_, 8u);
 }
 
+// 函数说明：MonitorFacade::onEvent，处理 UI 或通信事件。
+// 输入：context：回调上下文指针，由调用方传入并在回调中原样返回。；event：UI 或通信模块事件对象。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MonitorFacade::onEvent(void *context, const vm_comm_event_t *event) {
     auto *self = static_cast<MonitorFacade *>(context);
 
@@ -218,6 +277,10 @@ void MonitorFacade::onEvent(void *context, const vm_comm_event_t *event) {
     }
 }
 
+// 函数说明：MonitorFacade::load，加载外部文件或配置。
+// 输入：path：待加载的文件路径。；error：错误信息输出缓冲区。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 true 表示成功或条件成立，返回 false 表示失败或条件不成立。
 bool MonitorFacade::load(const QString &path, QString &error) {
     const QByteArray localPath = path.toLocal8Bit();
     char errorBuffer[VM_MONITOR_ERROR_MAX] = {};

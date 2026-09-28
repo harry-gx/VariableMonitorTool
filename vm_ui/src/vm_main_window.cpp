@@ -1,3 +1,9 @@
+/*
+ * 文件说明：主窗口实现，负责页面切换、MDI 子窗口、变量加载、监控轮询、标定发送和工程状态管理。
+ * 所属模块：UI 界面模块。
+ * 设计要点：正式业务逻辑集中在本文件或本模块内，测试代码位于 test 目录，第三方厂商头文件不在本次注释范围内。
+ */
+
 #include "vm_main_window.h"
 
 #include <QtWidgets>
@@ -9,6 +15,7 @@
 #include "pages/vm_monitor_page.h"
 #include "pages/vm_variable_load_page.h"
 
+// 类型说明：类封装对应 UI 组件或窗口的状态与操作。
 class ToolMdiSubWindow : public QMdiSubWindow {
 public:
     explicit ToolMdiSubWindow(QWidget *parent = nullptr) : QMdiSubWindow(parent) {}
@@ -23,6 +30,10 @@ protected:
     }
 };
 
+// 函数说明：deviceTypeToString，执行本模块对应功能逻辑。
+// 输入：type：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 Qt 字符串结果。
 static QString deviceTypeToString(UiDeviceType type) {
     switch (type) {
     case UiDeviceType::Can:
@@ -37,6 +48,10 @@ static QString deviceTypeToString(UiDeviceType type) {
     }
 }
 
+// 函数说明：deviceTypeFromString，执行本模块对应功能逻辑。
+// 输入：text：文本内容或输入字符串。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 static UiDeviceType deviceTypeFromString(const QString &text) {
     if (text == QStringLiteral("can")) {
         return UiDeviceType::Can;
@@ -50,16 +65,29 @@ static UiDeviceType deviceTypeFromString(const QString &text) {
     return UiDeviceType::Serial;
 }
 
+// 常量说明：kMonitorMaxRequestsPerTick 用于控制界面刷新、请求节流或超时参数。
 static constexpr int kMonitorMaxRequestsPerTick = 6;
+// 常量说明：kMonitorMaxBackgroundRequestsPerTick 用于控制界面刷新、请求节流或超时参数。
 static constexpr int kMonitorMaxBackgroundRequestsPerTick = 2;
+// 常量说明：kMonitorMaxPendingRequests 用于控制界面刷新、请求节流或超时参数。
 static constexpr int kMonitorMaxPendingRequests = 12;
+// 常量说明：kMonitorRequestTimeoutMs 用于控制界面刷新、请求节流或超时参数。
 static constexpr qint64 kMonitorRequestTimeoutMs = 1000;
+// 常量说明：kSerialIoPollIntervalMs 用于控制界面刷新、请求节流或超时参数。
 static constexpr int kSerialIoPollIntervalMs = 5;
 
+// 函数说明：requestKey，执行本模块对应功能逻辑。
+// 输入：address：函数输入参数，参与本函数的计算、查找或状态更新。；size：数据长度或缓冲区容量。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 static quint64 requestKey(quint32 address, quint16 size) {
     return (static_cast<quint64>(address) << 16) | static_cast<quint64>(size);
 }
 
+// 函数说明：QMainWindow，执行本模块对应功能逻辑。
+// 输入：parent：Qt 父对象指针。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回对象指针或缓冲区指针，返回 NULL 表示未找到或失败。
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     setWindowTitle(QStringLiteral("变量监控与标定工具"));
     resize(1200, 780);
@@ -240,6 +268,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     showPage(QStringLiteral("文件"));
 }
 
+// 函数说明：MainWindow::closeEvent，关闭底层资源。
+// 输入：event：UI 或通信模块事件对象。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::closeEvent(QCloseEvent *event) {
     saveRecentState();
     if (pollTimer_) {
@@ -254,12 +286,20 @@ void MainWindow::closeEvent(QCloseEvent *event) {
     QMainWindow::closeEvent(event);
 }
 
+// 函数说明：MainWindow::addPageDock，执行本模块对应功能逻辑。
+// 输入：name：函数输入参数，参与本函数的计算、查找或状态更新。；body：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::addPageDock(const QString &name, QWidget *body) {
     body->setObjectName(name);
     workspace_->addWidget(body);
     pages_[name] = body;
 }
 
+// 函数说明：MainWindow::showPage，显示指定页面或窗口。
+// 输入：name：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::showPage(const QString &name) {
     if (!projectOpen_ && name != QStringLiteral("文件")) {
         log(QStringLiteral("请先新建或加载工程配置"));
@@ -295,6 +335,10 @@ void MainWindow::showPage(const QString &name) {
     }
 }
 
+// 函数说明：MainWindow::showMdiToolWindow，显示指定页面或窗口。
+// 输入：name：函数输入参数，参与本函数的计算、查找或状态更新。；body：函数输入参数，参与本函数的计算、查找或状态更新。；window：函数输入参数，参与本函数的计算、查找或状态更新。；preferredSize：函数输入参数，参与本函数的计算、查找或状态更新。；offset：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::showMdiToolWindow(const QString &name,
                                    QWidget *body,
                                    QMdiSubWindow *&window,
@@ -331,6 +375,10 @@ void MainWindow::showMdiToolWindow(const QString &name,
     mdiArea_->setActiveSubWindow(window);
 }
 
+// 函数说明：MainWindow::log，执行本模块对应功能逻辑。
+// 输入：message：协议解析后的消息对象。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::log(const QString &message) {
     const QString line = QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss.zzz"))
         + QStringLiteral("  ") + message;
@@ -338,6 +386,10 @@ void MainWindow::log(const QString &message) {
     statusBar()->showMessage(message, 5000);
 }
 
+// 函数说明：MainWindow::refreshGate，刷新显示或使能状态。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::refreshGate() {
     const bool connected = facade_.connected();
     const bool ready = projectOpen_ && connected && loaded_;
@@ -362,8 +414,13 @@ void MainWindow::refreshGate() {
     updateRecentList();
 }
 
+// 函数说明：MainWindow::syncVariableTables，执行本模块对应功能逻辑。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::syncVariableTables() {
     calibrationTargets_ = calibrationPage_->collectTargets();
+    // 关键步骤：启动监控前清空未完成请求和扫描游标，避免上一次监控残留影响当前刷新。
     monitorPendingSince_.clear();
     monitorNextRow_ = 0;
     monitorNextCurveRow_ = 0;
@@ -376,6 +433,10 @@ void MainWindow::syncVariableTables() {
     refreshGate();
 }
 
+// 函数说明：MainWindow::loadImage，加载外部文件或配置。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::loadImage() {
     if (!projectOpen_) {
         log(QStringLiteral("请先新建或加载工程配置"));
@@ -395,6 +456,10 @@ void MainWindow::loadImage() {
     log(QStringLiteral("变量加载完成（当前为符号表变量）"));
 }
 
+// 函数说明：MainWindow::readMonitor，读取数据或发起读取请求。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::readMonitor() {
     const int sent = sendMonitorReads(monitorPage_->rowCount(), true);
     if (sent > 0) {
@@ -402,6 +467,10 @@ void MainWindow::readMonitor() {
     }
 }
 
+// 函数说明：MainWindow::startMonitor，执行本模块对应功能逻辑。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::startMonitor() {
     if (!facade_.connected() || monitorPage_->rowCount() <= 0) {
         log(QStringLiteral("当前没有可监控变量或设备未连接"));
@@ -416,6 +485,10 @@ void MainWindow::startMonitor() {
     log(QStringLiteral("开始监控"));
 }
 
+// 函数说明：MainWindow::stopMonitor，执行本模块对应功能逻辑。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::stopMonitor() {
     const bool wasActive = pollTimer_->isActive();
     pollTimer_->stop();
@@ -425,15 +498,24 @@ void MainWindow::stopMonitor() {
     }
 }
 
+// 函数说明：MainWindow::pollMonitor，轮询处理异步收发事件。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::pollMonitor() {
     facade_.poll();
     if (!pollTimer_->isActive()) {
         return;
     }
+    // 关键步骤：每次轮询先清理超时请求，再按窗口限制补发新请求，避免串口请求堆积造成卡顿。
     expireMonitorPending();
     sendMonitorReads(kMonitorMaxRequestsPerTick, false);
 }
 
+// 函数说明：MainWindow::expireMonitorPending，执行本模块对应功能逻辑。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::expireMonitorPending() {
     const qint64 now = QDateTime::currentMSecsSinceEpoch();
     for (auto it = monitorPendingSince_.begin(); it != monitorPendingSince_.end();) {
@@ -445,6 +527,10 @@ void MainWindow::expireMonitorPending() {
     }
 }
 
+// 函数说明：MainWindow::sendMonitorReads，读取数据或发起读取请求。
+// 输入：maxRequests：函数输入参数，参与本函数的计算、查找或状态更新。；logResult：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回整数结果，具体含义由调用场景决定。
 int MainWindow::sendMonitorReads(int maxRequests, bool logResult) {
     const int monitorRows = monitorPage_->rowCount();
     const int calibrationRows = calibrationPage_->rowCount();
@@ -550,6 +636,10 @@ int MainWindow::sendMonitorReads(int maxRequests, bool logResult) {
     return sent;
 }
 
+// 函数说明：MainWindow::readCalibration，读取数据或发起读取请求。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::readCalibration() {
     const int row = calibrationPage_->currentRow();
     if (row < 0) {
@@ -564,17 +654,29 @@ void MainWindow::readCalibration() {
     }
 }
 
+// 函数说明：MainWindow::writeCalibration，写入数据或发起标定请求。
+// 输入：confirm：是否执行确认流程。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::writeCalibration(bool confirm) {
     const int row = calibrationPage_->currentRow();
     writeCalibrationRow(row, confirm);
 }
 
+// 函数说明：MainWindow::writeCalibrationRow，写入数据或发起标定请求。
+// 输入：row：界面表格行号。；confirm：是否执行确认流程。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::writeCalibrationRow(int row, bool confirm) {
     if (sendCalibrationRow(row, true) && confirm) {
         readCalibration();
     }
 }
 
+// 函数说明：MainWindow::sendCalibrationRow，执行本模块对应功能逻辑。
+// 输入：row：界面表格行号。；logSuccess：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 true 表示成功或条件成立，返回 false 表示失败或条件不成立。
 bool MainWindow::sendCalibrationRow(int row, bool logSuccess) {
     if (row < 0) {
         log(QStringLiteral("请先选择标定变量"));
@@ -600,6 +702,10 @@ bool MainWindow::sendCalibrationRow(int row, bool logSuccess) {
     return true;
 }
 
+// 函数说明：MainWindow::writeAllCalibration，写入数据或发起标定请求。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::writeAllCalibration() {
     if (calibrationPage_->rowCount() <= 0) {
         log(QStringLiteral("当前没有可标定变量"));
@@ -610,6 +716,7 @@ void MainWindow::writeAllCalibration() {
     int success = 0;
     int failed = 0;
 
+    // 关键步骤：一键标定逐行发送已有目标值，空目标值行跳过，避免误写未编辑变量。
     for (int row = 0; row < calibrationPage_->rowCount(); ++row) {
         if (calibrationPage_->targetTextAt(row).trimmed().isEmpty()) {
             ++skipped;
@@ -634,6 +741,10 @@ void MainWindow::writeAllCalibration() {
             .arg(skipped));
 }
 
+// 函数说明：MainWindow::connectOrDisconnectDevice，建立连接并准备收发链路。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::connectOrDisconnectDevice() {
     if (!projectOpen_) {
         log(QStringLiteral("请先新建或加载工程配置"));
@@ -682,6 +793,10 @@ void MainWindow::connectOrDisconnectDevice() {
     refreshGate();
 }
 
+// 函数说明：MainWindow::newWorkspace，执行本模块对应功能逻辑。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::newWorkspace() {
     QString path = QFileDialog::getSaveFileName(this,
                                                 QStringLiteral("新建工程配置"),
@@ -717,6 +832,10 @@ void MainWindow::newWorkspace() {
     log(QStringLiteral("已新建工程配置"));
 }
 
+// 函数说明：MainWindow::saveWorkspace，保存当前状态或配置。
+// 输入：file：文件路径或文件对象。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::saveWorkspace(const QString &file) {
     if (!projectOpen_) {
         log(QStringLiteral("请先新建或加载工程配置"));
@@ -732,6 +851,10 @@ void MainWindow::saveWorkspace(const QString &file) {
     }
 }
 
+// 函数说明：MainWindow::saveCurrentWorkspace，保存当前状态或配置。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::saveCurrentWorkspace() {
     if (!projectOpen_ || activeConfigFile_.isEmpty()) {
         log(QStringLiteral("请先新建或加载工程配置"));
@@ -741,6 +864,10 @@ void MainWindow::saveCurrentWorkspace() {
     saveWorkspace(activeConfigFile_);
 }
 
+// 函数说明：MainWindow::writeWorkspace，写入数据或发起标定请求。
+// 输入：file：文件路径或文件对象。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 true 表示成功或条件成立，返回 false 表示失败或条件不成立。
 bool MainWindow::writeWorkspace(const QString &file) {
     QJsonObject object;
     object[QStringLiteral("version")] = 1;
@@ -771,6 +898,10 @@ bool MainWindow::writeWorkspace(const QString &file) {
     return saveFile.open(QIODevice::WriteOnly) && saveFile.write(bytes) == bytes.size() && saveFile.commit();
 }
 
+// 函数说明：MainWindow::loadWorkspaceDialog，加载外部文件或配置。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::loadWorkspaceDialog() {
     const QString path = QFileDialog::getOpenFileName(this, QStringLiteral("加载配置"),
                                                       QString(), QStringLiteral("JSON (*.json)"));
@@ -779,6 +910,10 @@ void MainWindow::loadWorkspaceDialog() {
     }
 }
 
+// 函数说明：MainWindow::exportWorkspaceDialog，执行本模块对应功能逻辑。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::exportWorkspaceDialog() {
     if (!projectOpen_) {
         log(QStringLiteral("请先新建或加载工程配置"));
@@ -797,6 +932,10 @@ void MainWindow::exportWorkspaceDialog() {
     }
 }
 
+// 函数说明：MainWindow::restoreWorkspace，执行本模块对应功能逻辑。
+// 输入：file：文件路径或文件对象。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::restoreWorkspace(const QString &file) {
     QFile input(file);
     if (!input.open(QIODevice::ReadOnly)) {
@@ -855,12 +994,20 @@ void MainWindow::restoreWorkspace(const QString &file) {
     showPage(QStringLiteral("文件"));
 }
 
+// 函数说明：MainWindow::openRecentItem，打开底层资源。
+// 输入：item：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::openRecentItem(QListWidgetItem *item) {
     if (item) {
         restoreWorkspace(item->data(Qt::UserRole).toString());
     }
 }
 
+// 函数说明：MainWindow::removeRecentFile，执行本模块对应功能逻辑。
+// 输入：file：文件路径或文件对象。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::removeRecentFile(const QString &file) {
     recentFiles_.removeAll(QDir::toNativeSeparators(QFileInfo(file).absoluteFilePath()));
     recentFiles_.removeAll(file);
@@ -868,6 +1015,10 @@ void MainWindow::removeRecentFile(const QString &file) {
     updateRecentList();
 }
 
+// 函数说明：MainWindow::touchRecent，执行本模块对应功能逻辑。
+// 输入：file：文件路径或文件对象。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::touchRecent(const QString &file) {
     const QString path = QDir::toNativeSeparators(QFileInfo(file).absoluteFilePath());
     recentFiles_.removeAll(path);
@@ -879,6 +1030,10 @@ void MainWindow::touchRecent(const QString &file) {
     updateRecentList();
 }
 
+// 函数说明：MainWindow::updateRecentList，刷新界面数据或内部状态。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::updateRecentList() {
     if (filePage_) {
         filePage_->setRecentFiles(recentFiles_, activeConfigFile_,
@@ -887,6 +1042,10 @@ void MainWindow::updateRecentList() {
     }
 }
 
+// 函数说明：MainWindow::loadRecentState，加载外部文件或配置。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::loadRecentState() {
     QFile input(appStatePath());
     if (!input.open(QIODevice::ReadOnly)) {
@@ -906,6 +1065,10 @@ void MainWindow::loadRecentState() {
     }
 }
 
+// 函数说明：MainWindow::saveRecentState，保存当前状态或配置。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void MainWindow::saveRecentState() const {
     QJsonArray recent;
     for (const auto &path : recentFiles_) {
@@ -922,12 +1085,20 @@ void MainWindow::saveRecentState() const {
     }
 }
 
+// 函数说明：MainWindow::appStatePath，执行本模块对应功能逻辑。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 Qt 字符串结果。
 QString MainWindow::appStatePath() const {
     const QString directory = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
     QDir().mkpath(directory);
     return directory + QStringLiteral("/recent.json");
 }
 
+// 函数说明：MainWindow::connectionText，建立连接并准备收发链路。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 Qt 字符串结果。
 QString MainWindow::connectionText() const {
     return facade_.connected()
         ? QStringLiteral("已连接：%1").arg(devicePage_->portName())

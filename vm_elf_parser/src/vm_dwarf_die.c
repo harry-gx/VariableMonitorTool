@@ -1,7 +1,19 @@
+/*
+ * 文件说明：DWARF DIE 树解析实现。
+ * 所属模块：ELF/AXF 解析模块。
+ * 设计要点：正式业务逻辑集中在本文件或本模块内，测试代码位于 test 目录，第三方厂商头文件不在本次注释范围内。
+ */
+
 #include "../private/vm_dwarf_internal.h"
 #include <stdlib.h>
 #include <string.h>
 
+/**
+ * 函数说明：vm_dwarf_die_attribute，执行本模块对应功能逻辑。
+ * 输入：die：函数输入参数，参与本函数的计算、查找或状态更新。；attribute：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回执行结果，具体含义由调用方按接口约定解释。
+ */
 const vm_dwarf_value_t *vm_dwarf_die_attribute(const vm_dwarf_die_view_t *die,
                                                uint64_t attribute)
 {
@@ -20,6 +32,12 @@ const vm_dwarf_value_t *vm_dwarf_die_attribute(const vm_dwarf_die_view_t *die,
     return NULL;
 }
 
+/**
+ * 函数说明：resolve_value，执行本模块对应功能逻辑。
+ * 输入：v：函数输入参数，参与本函数的计算、查找或状态更新。；s：函数输入参数，参与本函数的计算、查找或状态更新。；unit：函数输入参数，参与本函数的计算、查找或状态更新。；h：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t resolve_value(vm_dwarf_value_t *v,
                                  const vm_dwarf_sections_t *s,
                                  size_t unit,
@@ -64,6 +82,12 @@ static vm_status_t resolve_value(vm_dwarf_value_t *v,
     return VM_OK;
 }
 
+/**
+ * 函数说明：vm_dwarf_walk，执行本模块对应功能逻辑。
+ * 输入：s：函数输入参数，参与本函数的计算、查找或状态更新。；visitor：函数输入参数，参与本函数的计算、查找或状态更新。；context：回调上下文指针，由调用方传入并在回调中原样返回。；error：错误信息输出缓冲区。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_dwarf_walk(const vm_dwarf_sections_t *s,
                           vm_dwarf_die_fn visitor,
                           void *context,

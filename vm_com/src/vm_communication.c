@@ -1,3 +1,9 @@
+/*
+ * 文件说明：通信模块 COM 层实现，负责连接生命周期、请求队列、协议收发和值编解码调度。
+ * 所属模块：通信模块。
+ * 设计要点：正式业务逻辑集中在本文件或本模块内，测试代码位于 test 目录，第三方厂商头文件不在本次注释范围内。
+ */
+
 #include "vm_communication.h"
 
 #include "vm_custom_protocol.h"
@@ -9,17 +15,28 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* 常量说明：VM_COMM_SERIAL_CONNECTION_ID 用于配置协议长度、默认参数、缓冲区容量或编译开关。 */
 #define VM_COMM_SERIAL_CONNECTION_ID (1u)
+/* 常量说明：VM_COMM_CUSTOM_SERIAL_ROUTE_ID 用于配置协议长度、默认参数、缓冲区容量或编译开关。 */
 #define VM_COMM_CUSTOM_SERIAL_ROUTE_ID (1u)
+/* 常量说明：VM_COMM_SERIAL_CHANNEL 用于配置协议长度、默认参数、缓冲区容量或编译开关。 */
 #define VM_COMM_SERIAL_CHANNEL (0u)
+/* 常量说明：VM_COMM_SERIAL_ADDRESS 用于配置协议长度、默认参数、缓冲区容量或编译开关。 */
 #define VM_COMM_SERIAL_ADDRESS (0u)
+/* 常量说明：VM_COMM_FRAME_MAX 用于配置协议长度、默认参数、缓冲区容量或编译开关。 */
 #define VM_COMM_FRAME_MAX (1037u)
+/* 常量说明：VM_COMM_PAYLOAD_MAX 用于配置协议长度、默认参数、缓冲区容量或编译开关。 */
 #define VM_COMM_PAYLOAD_MAX (1024u)
+/* 常量说明：VM_COMM_PENDING_MAX 用于配置协议长度、默认参数、缓冲区容量或编译开关。 */
 #define VM_COMM_PENDING_MAX (32u)
+/* 常量说明：VM_COMM_DEFAULT_DATA_BITS 用于配置协议长度、默认参数、缓冲区容量或编译开关。 */
 #define VM_COMM_DEFAULT_DATA_BITS (8u)
+/* 常量说明：VM_COMM_DEFAULT_STOP_BITS 用于配置协议长度、默认参数、缓冲区容量或编译开关。 */
 #define VM_COMM_DEFAULT_STOP_BITS (1u)
+/* 常量说明：VM_COMM_DEFAULT_BAUDRATE 用于配置协议长度、默认参数、缓冲区容量或编译开关。 */
 #define VM_COMM_DEFAULT_BAUDRATE (115200u)
 
+/* 类型说明：枚举限定模块状态、事件或设备类型的取值范围。 */
 typedef enum
 {
     VM_COMM_PENDING_NONE = 0,
@@ -28,41 +45,70 @@ typedef enum
     VM_COMM_PENDING_BITFIELD_READ
 } vm_comm_pending_kind_t;
 
+/* 类型说明：结构体保存模块状态、配置、变量描述或解析结果。 */
 typedef struct
 {
+    /* 变量说明：name，变量名、页面名或节点名。 */
     char name[VM_COMM_NAME_MAX];
+    /* 变量说明：type_name，变量类型名称。 */
     char type_name[VM_COMM_NAME_MAX];
+    /* 变量说明：address，MCU 目标内存地址或协议地址。 */
     uint32_t address;
+    /* 变量说明：size，数据长度，单位为字节。 */
     uint16_t size;
+    /* 变量说明：writable，变量是否允许写入。 */
     uint8_t writable;
+    /* 变量说明：monitorable，变量是否允许加入监控表。 */
     uint8_t monitorable;
+    /* 变量说明：calibratable，变量是否允许加入标定表。 */
     uint8_t calibratable;
+    /* 变量说明：bit_field，是否为位字段变量。 */
     uint8_t bit_field;
+    /* 变量说明：bit_offset，位字段起始 bit 偏移。 */
     uint8_t bit_offset;
+    /* 变量说明：bit_size，位字段 bit 宽度。 */
     uint8_t bit_size;
 } vm_comm_variable_store_t;
 
+/* 类型说明：结构体保存模块状态、配置、变量描述或解析结果。 */
 typedef struct
 {
+    /* 变量说明：used，保存当前对象运行所需的状态、参数或缓存数据。 */
     uint8_t used;
+    /* 变量说明：sequence，协议序号，用于匹配请求和响应。 */
     uint8_t sequence;
+    /* 变量说明：kind，保存当前对象运行所需的状态、参数或缓存数据。 */
     vm_comm_pending_kind_t kind;
+    /* 变量说明：variable，保存当前对象运行所需的状态、参数或缓存数据。 */
     vm_comm_variable_store_t variable;
+    /* 变量说明：target_text，保存当前对象运行所需的状态、参数或缓存数据。 */
     char target_text[VM_COMM_TEXT_MAX];
 } vm_comm_pending_t;
 
+/* 类型说明：结构体保存模块状态、配置、变量描述或解析结果。 */
 struct vm_comm
 {
+    /* 变量说明：serial，串口传输对象。 */
     vm_serial_transport_t *serial;
+    /* 变量说明：router，内部路由对象。 */
     vm_router_t *router;
+    /* 变量说明：parser，协议流式解析器。 */
     vm_custom_parser_t *parser;
+    /* 变量说明：callback，事件回调函数。 */
     vm_comm_event_fn callback;
+    /* 变量说明：callback_context，回调上下文。 */
     void *callback_context;
+    /* 变量说明：config，设备配置缓存。 */
     vm_comm_device_config_t config;
+    /* 变量说明：serial_device，保存当前对象运行所需的状态、参数或缓存数据。 */
     char serial_device[VM_COMM_TEXT_MAX];
+    /* 变量说明：can_adapter，保存当前对象运行所需的状态、参数或缓存数据。 */
     char can_adapter[VM_COMM_TEXT_MAX];
+    /* 变量说明：network_host，保存当前对象运行所需的状态、参数或缓存数据。 */
     char network_host[VM_COMM_TEXT_MAX];
+    /* 变量说明：sequence，协议序号，用于匹配请求和响应。 */
     uint8_t sequence;
+    /* 变量说明：pending，未完成请求数组。 */
     vm_comm_pending_t pending[VM_COMM_PENDING_MAX];
 };
 
@@ -94,6 +140,12 @@ static vm_status_t vm_comm_handle_error(vm_comm_t *comm,
                                         const vm_custom_message_t *msg,
                                         vm_comm_pending_t *pending);
 
+/**
+ * 函数说明：vm_comm_copy_text，复制文本或结构化数据。
+ * 输入：out：输出对象或结果指针，函数成功时写入有效值。；out_size：函数输入参数，参与本函数的计算、查找或状态更新。；input：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：无返回值。
+ */
 static void vm_comm_copy_text(char *out, size_t out_size, const char *input)
 {
     if ((out != NULL) && (out_size > 0u))
@@ -110,6 +162,12 @@ static void vm_comm_copy_text(char *out, size_t out_size, const char *input)
     }
 }
 
+/**
+ * 函数说明：vm_comm_set_error，执行本模块对应功能逻辑。
+ * 输入：error：错误信息输出缓冲区。；error_size：错误信息缓冲区长度。；message：协议解析后的消息对象。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：无返回值。
+ */
 static void vm_comm_set_error(char *error,
                               size_t error_size,
                               const char *message)
@@ -117,6 +175,12 @@ static void vm_comm_set_error(char *error,
     vm_comm_copy_text(error, error_size, message);
 }
 
+/**
+ * 函数说明：vm_comm_clear_pending，执行本模块对应功能逻辑。
+ * 输入：comm：通信模块上下文指针。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：无返回值。
+ */
 static void vm_comm_clear_pending(vm_comm_t *comm)
 {
     if (comm != NULL)
@@ -125,6 +189,12 @@ static void vm_comm_clear_pending(vm_comm_t *comm)
     }
 }
 
+/**
+ * 函数说明：vm_comm_copy_variable，复制文本或结构化数据。
+ * 输入：out：输出对象或结果指针，函数成功时写入有效值。；input：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：无返回值。
+ */
 static void vm_comm_copy_variable(vm_comm_variable_store_t *out,
                                   const vm_comm_variable_t *input)
 {
@@ -146,6 +216,12 @@ static void vm_comm_copy_variable(vm_comm_variable_store_t *out,
     }
 }
 
+/**
+ * 函数说明：vm_comm_meta_from_variable，执行本模块对应功能逻辑。
+ * 输入：variable：变量描述信息，包含变量名、类型、地址、长度和权限。；meta：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：无返回值。
+ */
 static void vm_comm_meta_from_variable(const vm_comm_variable_store_t *variable,
                                        vm_value_meta_t *meta)
 {
@@ -160,6 +236,12 @@ static void vm_comm_meta_from_variable(const vm_comm_variable_store_t *variable,
     }
 }
 
+/**
+ * 函数说明：vm_comm_alloc_pending，执行本模块对应功能逻辑。
+ * 输入：comm：通信模块上下文指针。；sequence：函数输入参数，参与本函数的计算、查找或状态更新。；kind：函数输入参数，参与本函数的计算、查找或状态更新。；var：变量描述或变量缓存信息。；target_text：UI 输入的目标值字符串，通常为十进制文本。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回执行结果，具体含义由调用方按接口约定解释。
+ */
 static vm_comm_pending_t *vm_comm_alloc_pending(vm_comm_t *comm,
                                                 uint8_t sequence,
                                                 vm_comm_pending_kind_t kind,
@@ -193,6 +275,12 @@ static vm_comm_pending_t *vm_comm_alloc_pending(vm_comm_t *comm,
     return pending;
 }
 
+/**
+ * 函数说明：vm_comm_find_pending，查找匹配对象。
+ * 输入：comm：通信模块上下文指针。；sequence：函数输入参数，参与本函数的计算、查找或状态更新。；address：函数输入参数，参与本函数的计算、查找或状态更新。；size：数据长度或缓冲区容量。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回执行结果，具体含义由调用方按接口约定解释。
+ */
 static vm_comm_pending_t *vm_comm_find_pending(vm_comm_t *comm,
                                                uint8_t sequence,
                                                uint32_t address,
@@ -233,6 +321,12 @@ static vm_comm_pending_t *vm_comm_find_pending(vm_comm_t *comm,
     return pending;
 }
 
+/**
+ * 函数说明：vm_comm_free_pending，执行本模块对应功能逻辑。
+ * 输入：pending：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：无返回值。
+ */
 static void vm_comm_free_pending(vm_comm_pending_t *pending)
 {
     if (pending != NULL)
@@ -241,6 +335,12 @@ static void vm_comm_free_pending(vm_comm_pending_t *pending)
     }
 }
 
+/**
+ * 函数说明：vm_comm_emit，执行本模块对应功能逻辑。
+ * 输入：comm：通信模块上下文指针。；event：UI 或通信模块事件对象。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：无返回值。
+ */
 static void vm_comm_emit(vm_comm_t *comm, const vm_comm_event_t *event)
 {
     if ((comm != NULL) && (event != NULL) && (comm->callback != NULL))
@@ -249,6 +349,12 @@ static void vm_comm_emit(vm_comm_t *comm, const vm_comm_event_t *event)
     }
 }
 
+/**
+ * 函数说明：vm_comm_fill_event_variable，处理 UI 或通信事件。
+ * 输入：event：UI 或通信模块事件对象。；variable：变量描述信息，包含变量名、类型、地址、长度和权限。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：无返回值。
+ */
 static void vm_comm_fill_event_variable(vm_comm_event_t *event,
                                         const vm_comm_variable_store_t *variable)
 {
@@ -260,6 +366,12 @@ static void vm_comm_fill_event_variable(vm_comm_event_t *event,
     }
 }
 
+/**
+ * 函数说明：vm_comm_next_sequence，执行本模块对应功能逻辑。
+ * 输入：comm：通信模块上下文指针。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 1 表示条件成立或状态有效，返回 0 表示条件不成立。
+ */
 static uint8_t vm_comm_next_sequence(vm_comm_t *comm)
 {
     uint8_t sequence;
@@ -274,6 +386,12 @@ static uint8_t vm_comm_next_sequence(vm_comm_t *comm)
     return sequence;
 }
 
+/**
+ * 函数说明：vm_comm_create，创建并初始化对象。
+ * 输入：out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_comm_create(vm_comm_t **out)
 {
     vm_comm_t *comm;
@@ -298,6 +416,12 @@ vm_status_t vm_comm_create(vm_comm_t **out)
     return VM_OK;
 }
 
+/**
+ * 函数说明：vm_comm_destroy，销毁对象并释放相关资源。
+ * 输入：comm：通信模块上下文指针。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：无返回值。
+ */
 void vm_comm_destroy(vm_comm_t *comm)
 {
     if (comm != NULL)
@@ -307,6 +431,12 @@ void vm_comm_destroy(vm_comm_t *comm)
     }
 }
 
+/**
+ * 函数说明：vm_comm_set_device_config，执行本模块对应功能逻辑。
+ * 输入：comm：通信模块上下文指针。；config：设备连接参数或模块初始化参数。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_comm_set_device_config(vm_comm_t *comm,
                                       const vm_comm_device_config_t *config)
 {
@@ -346,6 +476,12 @@ vm_status_t vm_comm_set_device_config(vm_comm_t *comm,
     return status;
 }
 
+/**
+ * 函数说明：vm_comm_connect，建立连接并准备收发链路。
+ * 输入：comm：通信模块上下文指针。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_comm_connect(vm_comm_t *comm)
 {
     vm_status_t status;
@@ -377,6 +513,12 @@ vm_status_t vm_comm_connect(vm_comm_t *comm)
     return status;
 }
 
+/**
+ * 函数说明：vm_comm_disconnect，建立连接并准备收发链路。
+ * 输入：comm：通信模块上下文指针。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：无返回值。
+ */
 void vm_comm_disconnect(vm_comm_t *comm)
 {
     if (comm != NULL)
@@ -387,16 +529,29 @@ void vm_comm_disconnect(vm_comm_t *comm)
         comm->router = NULL;
         vm_custom_parser_destroy(comm->parser);
         comm->parser = NULL;
+        /* 关键步骤：连接成功后重置协议序号和 pending 表，避免沿用上一次连接残留的请求状态。 */
         comm->sequence = 0u;
         vm_comm_clear_pending(comm);
     }
 }
 
+/**
+ * 函数说明：vm_comm_is_connected，建立连接并准备收发链路。
+ * 输入：comm：通信模块上下文指针。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 1 表示条件成立或状态有效，返回 0 表示条件不成立。
+ */
 uint8_t vm_comm_is_connected(const vm_comm_t *comm)
 {
     return (uint8_t)(((comm != NULL) && (comm->serial != NULL)) ? 1u : 0u);
 }
 
+/**
+ * 函数说明：vm_comm_set_event_callback，处理 UI 或通信事件。
+ * 输入：comm：通信模块上下文指针。；callback：事件回调函数指针。；context：回调上下文指针，由调用方传入并在回调中原样返回。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：无返回值。
+ */
 void vm_comm_set_event_callback(vm_comm_t *comm,
                                 vm_comm_event_fn callback,
                                 void *context)
@@ -408,6 +563,12 @@ void vm_comm_set_event_callback(vm_comm_t *comm,
     }
 }
 
+/**
+ * 函数说明：vm_comm_read_variable，读取数据或发起读取请求。
+ * 输入：comm：通信模块上下文指针。；variable：变量描述信息，包含变量名、类型、地址、长度和权限。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_comm_read_variable(vm_comm_t *comm,
                                   const vm_comm_variable_t *variable)
 {
@@ -422,6 +583,12 @@ vm_status_t vm_comm_read_variable(vm_comm_t *comm,
     return vm_comm_send_read(comm, &stored, VM_COMM_PENDING_READ, NULL);
 }
 
+/**
+ * 函数说明：vm_comm_write_variable，写入数据或发起标定请求。
+ * 输入：comm：通信模块上下文指针。；variable：变量描述信息，包含变量名、类型、地址、长度和权限。；target_text：UI 输入的目标值字符串，通常为十进制文本。；error：错误信息输出缓冲区。；error_size：错误信息缓冲区长度。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_comm_write_variable(vm_comm_t *comm,
                                    const vm_comm_variable_t *variable,
                                    const char *target_text,
@@ -490,6 +657,12 @@ vm_status_t vm_comm_write_variable(vm_comm_t *comm,
     return status;
 }
 
+/**
+ * 函数说明：vm_comm_poll，轮询处理异步收发事件。
+ * 输入：comm：通信模块上下文指针。；budget：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_comm_poll(vm_comm_t *comm, uint8_t budget)
 {
     uint8_t index;
@@ -513,6 +686,12 @@ vm_status_t vm_comm_poll(vm_comm_t *comm, uint8_t budget)
     return status;
 }
 
+/**
+ * 函数说明：vm_comm_connect_serial，建立连接并准备收发链路。
+ * 输入：comm：通信模块上下文指针。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t vm_comm_connect_serial(vm_comm_t *comm)
 {
     vm_serial_config_t serial_config;
@@ -524,6 +703,7 @@ static vm_status_t vm_comm_connect_serial(vm_comm_t *comm)
         return VM_INVALID;
     }
 
+    /* 关键步骤：把 COM 层缓存的串口配置转换为底层 serial transport 使用的配置结构。 */
     serial_config.device = comm->config.serial_device;
     serial_config.baudrate = comm->config.serial_baudrate;
     serial_config.data_bits = comm->config.serial_data_bits;
@@ -531,6 +711,7 @@ static vm_status_t vm_comm_connect_serial(vm_comm_t *comm)
     serial_config.parity = comm->config.serial_parity;
     serial_config.flow_control = comm->config.serial_flow_control;
 
+    /* 关键步骤：按顺序创建串口对象、打开设备、创建协议解析器和路由器，任一步失败都停止后续初始化。 */
     status = vm_serial_transport_create(&serial_config, &comm->serial);
     if (status == VM_OK)
     {
@@ -553,6 +734,7 @@ static vm_status_t vm_comm_connect_serial(vm_comm_t *comm)
     }
     if (status == VM_OK)
     {
+        /* 关键步骤：绑定自定义协议的串口路由，后续读写请求统一通过 route_id 找到发送通道。 */
         route.route_id = VM_COMM_CUSTOM_SERIAL_ROUTE_ID;
         route.connection = VM_COMM_SERIAL_CONNECTION_ID;
         route.channel = VM_COMM_SERIAL_CHANNEL;
@@ -573,6 +755,12 @@ static vm_status_t vm_comm_connect_serial(vm_comm_t *comm)
     return status;
 }
 
+/**
+ * 函数说明：vm_comm_send_read，读取数据或发起读取请求。
+ * 输入：comm：通信模块上下文指针。；variable：变量描述信息，包含变量名、类型、地址、长度和权限。；kind：函数输入参数，参与本函数的计算、查找或状态更新。；target_text：UI 输入的目标值字符串，通常为十进制文本。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t vm_comm_send_read(vm_comm_t *comm,
                                      const vm_comm_variable_store_t *variable,
                                      vm_comm_pending_kind_t kind,
@@ -593,6 +781,7 @@ static vm_status_t vm_comm_send_read(vm_comm_t *comm,
         return VM_INVALID;
     }
 
+    /* 关键步骤：为读请求分配新的协议序号，并把变量地址和长度编码成自定义协议读帧。 */
     sequence = vm_comm_next_sequence(comm);
     status = vm_custom_make_read(sequence,
                                  variable->address,
@@ -602,6 +791,7 @@ static vm_status_t vm_comm_send_read(vm_comm_t *comm,
                                  &written);
     if (status == VM_OK)
     {
+        /* 关键步骤：发送前登记 pending 请求，响应回来后用 sequence 找回变量元数据和请求类型。 */
         if (vm_comm_alloc_pending(comm,
                                   sequence,
                                   kind,
@@ -613,6 +803,7 @@ static vm_status_t vm_comm_send_read(vm_comm_t *comm,
     }
     if (status == VM_OK)
     {
+        /* 关键步骤：通过路由层发送已编码的协议帧，COM 层不直接操作串口发送细节。 */
         status = vm_router_send(comm->router,
                                 VM_COMM_CUSTOM_SERIAL_ROUTE_ID,
                                 frame,
@@ -622,6 +813,12 @@ static vm_status_t vm_comm_send_read(vm_comm_t *comm,
     return status;
 }
 
+/**
+ * 函数说明：vm_comm_send_write_bytes，写入数据或发起标定请求。
+ * 输入：comm：通信模块上下文指针。；var：变量描述或变量缓存信息。；data：输入或输出的原始字节缓冲区。；size：数据长度或缓冲区容量。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t vm_comm_send_write_bytes(vm_comm_t *comm,
                                             const vm_comm_variable_store_t *var,
                                             const uint8_t *data,
@@ -643,6 +840,7 @@ static vm_status_t vm_comm_send_write_bytes(vm_comm_t *comm,
         return VM_INVALID;
     }
 
+    /* 关键步骤：写请求同样使用独立序号，保证写确认能和当前标定变量对应。 */
     sequence = vm_comm_next_sequence(comm);
     status = vm_custom_make_write(sequence,
                                   var->address,
@@ -673,6 +871,12 @@ static vm_status_t vm_comm_send_write_bytes(vm_comm_t *comm,
     return status;
 }
 
+/**
+ * 函数说明：vm_comm_handle_read_response，读取数据或发起读取请求。
+ * 输入：comm：通信模块上下文指针。；msg：协议解析后的消息对象。；pending：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t vm_comm_handle_read_response(vm_comm_t *comm,
                                                 const vm_custom_message_t *msg,
                                                 vm_comm_pending_t *pending)
@@ -693,6 +897,7 @@ static vm_status_t vm_comm_handle_read_response(vm_comm_t *comm,
         return VM_OK;
     }
 
+    /* 关键步骤：位字段写入需要先读出整个存储单元，再只替换目标 bit，避免破坏同一字节/字中的其它位。 */
     if (pending->kind == VM_COMM_PENDING_BITFIELD_READ)
     {
         vm_comm_meta_from_variable(&pending->variable, &meta);
@@ -722,6 +927,7 @@ static vm_status_t vm_comm_handle_read_response(vm_comm_t *comm,
             event.protocol_command = msg->command;
             vm_comm_fill_event_variable(&event, &pending->variable);
             vm_comm_copy_text(event.message, sizeof(event.message), error);
+            /* 关键步骤：所有协议结果最后统一转换成 COM 事件上报 UI，UI 不需要理解底层协议帧。 */
             vm_comm_emit(comm, &event);
             vm_comm_free_pending(pending);
         }
@@ -733,6 +939,7 @@ static vm_status_t vm_comm_handle_read_response(vm_comm_t *comm,
     event.protocol_command = msg->command;
     vm_comm_fill_event_variable(&event, &pending->variable);
     vm_comm_meta_from_variable(&pending->variable, &meta);
+    /* 关键步骤：读响应先格式化为 UI 显示用十进制文本，再尝试转换为曲线绘图用 double。 */
     status = vm_value_format(&meta,
                              msg->payload,
                              msg->length,
@@ -756,6 +963,12 @@ static vm_status_t vm_comm_handle_read_response(vm_comm_t *comm,
     return VM_OK;
 }
 
+/**
+ * 函数说明：vm_comm_handle_write_response，写入数据或发起标定请求。
+ * 输入：comm：通信模块上下文指针。；msg：协议解析后的消息对象。；pending：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t vm_comm_handle_write_response(vm_comm_t *comm,
                                                  const vm_custom_message_t *msg,
                                                  vm_comm_pending_t *pending)
@@ -789,6 +1002,12 @@ static vm_status_t vm_comm_handle_write_response(vm_comm_t *comm,
     return VM_OK;
 }
 
+/**
+ * 函数说明：vm_comm_handle_error，执行本模块对应功能逻辑。
+ * 输入：comm：通信模块上下文指针。；msg：协议解析后的消息对象。；pending：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t vm_comm_handle_error(vm_comm_t *comm,
                                         const vm_custom_message_t *msg,
                                         vm_comm_pending_t *pending)
@@ -827,6 +1046,12 @@ static vm_status_t vm_comm_handle_error(vm_comm_t *comm,
     return VM_OK;
 }
 
+/**
+ * 函数说明：vm_comm_on_message，执行本模块对应功能逻辑。
+ * 输入：context：回调上下文指针，由调用方传入并在回调中原样返回。；message：协议解析后的消息对象。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t vm_comm_on_message(void *context,
                                       const vm_custom_message_t *message)
 {
@@ -866,6 +1091,12 @@ static vm_status_t vm_comm_on_message(void *context,
     return status;
 }
 
+/**
+ * 函数说明：vm_comm_on_router_protocol_receive，执行本模块对应功能逻辑。
+ * 输入：context：回调上下文指针，由调用方传入并在回调中原样返回。；frame：协议帧或传输帧数据。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t vm_comm_on_router_protocol_receive(void *context,
                                                       const vm_frame_t *frame)
 {
@@ -884,6 +1115,12 @@ static vm_status_t vm_comm_on_router_protocol_receive(void *context,
                                  comm);
 }
 
+/**
+ * 函数说明：vm_comm_on_router_transport_send，执行本模块对应功能逻辑。
+ * 输入：context：回调上下文指针，由调用方传入并在回调中原样返回。；frame：协议帧或传输帧数据。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t vm_comm_on_router_transport_send(void *context,
                                                     const vm_frame_t *frame)
 {
@@ -901,6 +1138,12 @@ static vm_status_t vm_comm_on_router_transport_send(void *context,
                              frame->channel);
 }
 
+/**
+ * 函数说明：vm_comm_on_transport_packet，执行本模块对应功能逻辑。
+ * 输入：context：回调上下文指针，由调用方传入并在回调中原样返回。；packet：底层传输收到的数据包。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t vm_comm_on_transport_packet(
     void *context,
     const vm_transport_packet_t *packet)

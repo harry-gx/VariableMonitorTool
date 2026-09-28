@@ -1,3 +1,9 @@
+/*
+ * 文件说明：通信模块值编解码实现，负责 MCU 原始内存字节与 UI 十进制文本之间的转换。
+ * 所属模块：通信模块。
+ * 设计要点：正式业务逻辑集中在本文件或本模块内，测试代码位于 test 目录，第三方厂商头文件不在本次注释范围内。
+ */
+
 #include "vm_value_codec.h"
 
 #include <ctype.h>
@@ -7,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* 类型说明：枚举限定模块状态、事件或设备类型的取值范围。 */
 typedef enum
 {
     VM_VALUE_UNSIGNED = 0,
@@ -16,6 +23,12 @@ typedef enum
     VM_VALUE_BYTES
 } vm_value_kind_t;
 
+/**
+ * 函数说明：vm_value_set_error，执行本模块对应功能逻辑。
+ * 输入：error：错误信息输出缓冲区。；error_size：错误信息缓冲区长度。；message：协议解析后的消息对象。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：无返回值。
+ */
 static void
 vm_value_set_error(char *error, size_t error_size, const char *message)
 {
@@ -31,6 +44,12 @@ vm_value_set_error(char *error, size_t error_size, const char *message)
     }
 }
 
+/**
+ * 函数说明：vm_value_copy_lower，复制文本或结构化数据。
+ * 输入：out：输出对象或结果指针，函数成功时写入有效值。；out_size：函数输入参数，参与本函数的计算、查找或状态更新。；input：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：无返回值。
+ */
 static void vm_value_copy_lower(char *out, size_t out_size, const char *input)
 {
     size_t index;
@@ -69,6 +88,12 @@ static void vm_value_copy_lower(char *out, size_t out_size, const char *input)
     }
 }
 
+/**
+ * 函数说明：vm_value_remove_token，执行本模块对应功能逻辑。
+ * 输入：text：文本内容或输入字符串。；token：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：无返回值。
+ */
 static void vm_value_remove_token(char *text, const char *token)
 {
     char *found;
@@ -91,6 +116,12 @@ static void vm_value_remove_token(char *text, const char *token)
     }
 }
 
+/**
+ * 函数说明：vm_value_text_contains，执行本模块对应功能逻辑。
+ * 输入：text：文本内容或输入字符串。；needle：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 1 表示条件成立或状态有效，返回 0 表示条件不成立。
+ */
 static uint8_t vm_value_text_contains(const char *text, const char *needle)
 {
     uint8_t result;
@@ -107,6 +138,12 @@ static uint8_t vm_value_text_contains(const char *text, const char *needle)
     return result;
 }
 
+/**
+ * 函数说明：vm_value_text_starts_with，执行本模块对应功能逻辑。
+ * 输入：text：文本内容或输入字符串。；prefix：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 1 表示条件成立或状态有效，返回 0 表示条件不成立。
+ */
 static uint8_t vm_value_text_starts_with(const char *text, const char *prefix)
 {
     uint8_t result;
@@ -123,6 +160,12 @@ static uint8_t vm_value_text_starts_with(const char *text, const char *prefix)
     return result;
 }
 
+/**
+ * 函数说明：vm_value_text_equals，执行本模块对应功能逻辑。
+ * 输入：left：函数输入参数，参与本函数的计算、查找或状态更新。；right：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 1 表示条件成立或状态有效，返回 0 表示条件不成立。
+ */
 static uint8_t vm_value_text_equals(const char *left, const char *right)
 {
     uint8_t result;
@@ -139,6 +182,12 @@ static uint8_t vm_value_text_equals(const char *left, const char *right)
     return result;
 }
 
+/**
+ * 函数说明：vm_value_infer_kind，执行本模块对应功能逻辑。
+ * 输入：meta：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回执行结果，具体含义由调用方按接口约定解释。
+ */
 static vm_value_kind_t vm_value_infer_kind(const vm_value_meta_t *meta)
 {
     char name[128];
@@ -241,6 +290,12 @@ static vm_value_kind_t vm_value_infer_kind(const vm_value_meta_t *meta)
     return kind;
 }
 
+/**
+ * 函数说明：vm_value_read_unsigned_le，读取数据或发起读取请求。
+ * 输入：data：输入或输出的原始字节缓冲区。；data_size：函数输入参数，参与本函数的计算、查找或状态更新。；size：数据长度或缓冲区容量。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回执行结果，具体含义由调用方按接口约定解释。
+ */
 static uint64_t
 vm_value_read_unsigned_le(const uint8_t *data, size_t data_size, uint16_t size)
 {
@@ -270,6 +325,12 @@ vm_value_read_unsigned_le(const uint8_t *data, size_t data_size, uint16_t size)
     return value;
 }
 
+/**
+ * 函数说明：vm_value_read_signed_le，读取数据或发起读取请求。
+ * 输入：data：输入或输出的原始字节缓冲区。；data_size：函数输入参数，参与本函数的计算、查找或状态更新。；size：数据长度或缓冲区容量。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回整数结果，具体含义由调用场景决定。
+ */
 static int64_t
 vm_value_read_signed_le(const uint8_t *data, size_t data_size, uint16_t size)
 {
@@ -300,6 +361,12 @@ vm_value_read_signed_le(const uint8_t *data, size_t data_size, uint16_t size)
     return value;
 }
 
+/**
+ * 函数说明：vm_value_read_float32_le，读取数据或发起读取请求。
+ * 输入：data：输入或输出的原始字节缓冲区。；data_size：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回执行结果，具体含义由调用方按接口约定解释。
+ */
 static float vm_value_read_float32_le(const uint8_t *data, size_t data_size)
 {
     uint32_t raw;
@@ -311,6 +378,12 @@ static float vm_value_read_float32_le(const uint8_t *data, size_t data_size)
     return value;
 }
 
+/**
+ * 函数说明：vm_value_read_float64_le，读取数据或发起读取请求。
+ * 输入：data：输入或输出的原始字节缓冲区。；data_size：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回执行结果，具体含义由调用方按接口约定解释。
+ */
 static double vm_value_read_float64_le(const uint8_t *data, size_t data_size)
 {
     uint64_t raw;
@@ -322,6 +395,12 @@ static double vm_value_read_float64_le(const uint8_t *data, size_t data_size)
     return value;
 }
 
+/**
+ * 函数说明：vm_value_trim_float_text，执行本模块对应功能逻辑。
+ * 输入：text：文本内容或输入字符串。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：无返回值。
+ */
 static void vm_value_trim_float_text(char *text)
 {
     size_t length;
@@ -345,6 +424,12 @@ static void vm_value_trim_float_text(char *text)
     }
 }
 
+/**
+ * 函数说明：vm_value_write_text，写入数据或发起标定请求。
+ * 输入：out：输出对象或结果指针，函数成功时写入有效值。；out_size：函数输入参数，参与本函数的计算、查找或状态更新。；text：文本内容或输入字符串。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t
 vm_value_write_text(char *out, size_t out_size, const char *text)
 {
@@ -367,6 +452,12 @@ vm_value_write_text(char *out, size_t out_size, const char *text)
     return status;
 }
 
+/**
+ * 函数说明：vm_value_u64_to_text，执行本模块对应功能逻辑。
+ * 输入：value：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。；out_size：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t
 vm_value_u64_to_text(uint64_t value, char *out, size_t out_size)
 {
@@ -387,6 +478,12 @@ vm_value_u64_to_text(uint64_t value, char *out, size_t out_size)
     return vm_value_write_text(out, out_size, &buffer[index]);
 }
 
+/**
+ * 函数说明：vm_value_i64_to_text，执行本模块对应功能逻辑。
+ * 输入：value：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。；out_size：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t
 vm_value_i64_to_text(int64_t value, char *out, size_t out_size)
 {
@@ -423,6 +520,12 @@ vm_value_i64_to_text(int64_t value, char *out, size_t out_size)
     return vm_value_write_text(out, out_size, &buffer[index]);
 }
 
+/**
+ * 函数说明：vm_value_bit_mask，执行本模块对应功能逻辑。
+ * 输入：bit_size：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回执行结果，具体含义由调用方按接口约定解释。
+ */
 static uint64_t vm_value_bit_mask(uint8_t bit_size)
 {
     uint64_t mask;
@@ -439,6 +542,12 @@ static uint64_t vm_value_bit_mask(uint8_t bit_size)
     return mask;
 }
 
+/**
+ * 函数说明：vm_value_valid_bit_field，执行本模块对应功能逻辑。
+ * 输入：size：数据长度或缓冲区容量。；bit_offset：函数输入参数，参与本函数的计算、查找或状态更新。；bit_size：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 1 表示条件成立或状态有效，返回 0 表示条件不成立。
+ */
 static uint8_t
 vm_value_valid_bit_field(uint16_t size, uint8_t bit_offset, uint8_t bit_size)
 {
@@ -454,6 +563,12 @@ vm_value_valid_bit_field(uint16_t size, uint8_t bit_offset, uint8_t bit_size)
     return result;
 }
 
+/**
+ * 函数说明：vm_value_read_bit_field_unsigned，读取数据或发起读取请求。
+ * 输入：data：输入或输出的原始字节缓冲区。；data_size：函数输入参数，参与本函数的计算、查找或状态更新。；size：数据长度或缓冲区容量。；bit_offset：函数输入参数，参与本函数的计算、查找或状态更新。；bit_size：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回执行结果，具体含义由调用方按接口约定解释。
+ */
 static uint64_t vm_value_read_bit_field_unsigned(const uint8_t *data,
                                                  size_t data_size,
                                                  uint16_t size,
@@ -464,6 +579,12 @@ static uint64_t vm_value_read_bit_field_unsigned(const uint8_t *data,
            vm_value_bit_mask(bit_size);
 }
 
+/**
+ * 函数说明：vm_value_sign_extend_bit_field，执行本模块对应功能逻辑。
+ * 输入：raw：函数输入参数，参与本函数的计算、查找或状态更新。；bit_size：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回整数结果，具体含义由调用场景决定。
+ */
 static int64_t vm_value_sign_extend_bit_field(uint64_t raw, uint8_t bit_size)
 {
     uint64_t sign_bit;
@@ -491,6 +612,12 @@ static int64_t vm_value_sign_extend_bit_field(uint64_t raw, uint8_t bit_size)
     return value;
 }
 
+/**
+ * 函数说明：vm_value_format_bytes，执行本模块对应功能逻辑。
+ * 输入：data：输入或输出的原始字节缓冲区。；data_size：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。；out_size：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t vm_value_format_bytes(const uint8_t *data,
                                          size_t data_size,
                                          char *out,
@@ -526,6 +653,12 @@ static vm_status_t vm_value_format_bytes(const uint8_t *data,
     return status;
 }
 
+/**
+ * 函数说明：vm_value_append_unsigned_le，追加数据到目标容器。
+ * 输入：out：输出对象或结果指针，函数成功时写入有效值。；value：函数输入参数，参与本函数的计算、查找或状态更新。；size：数据长度或缓冲区容量。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：无返回值。
+ */
 static void
 vm_value_append_unsigned_le(uint8_t *out, uint64_t value, uint16_t size)
 {
@@ -540,6 +673,12 @@ vm_value_append_unsigned_le(uint8_t *out, uint64_t value, uint16_t size)
     }
 }
 
+/**
+ * 函数说明：vm_value_trim_input，执行本模块对应功能逻辑。
+ * 输入：text：文本内容或输入字符串。；buffer：临时数据缓冲区。；buffer_size：临时数据缓冲区容量。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回对象指针或缓冲区指针，返回 NULL 表示未找到或失败。
+ */
 static const char *
 vm_value_trim_input(const char *text, char *buffer, size_t buffer_size)
 {
@@ -579,6 +718,12 @@ vm_value_trim_input(const char *text, char *buffer, size_t buffer_size)
     return buffer;
 }
 
+/**
+ * 函数说明：vm_value_format，执行本模块对应功能逻辑。
+ * 输入：meta：函数输入参数，参与本函数的计算、查找或状态更新。；data：输入或输出的原始字节缓冲区。；data_size：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。；out_size：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_value_format(const vm_value_meta_t *meta,
                             const uint8_t *data,
                             size_t data_size,
@@ -698,6 +843,12 @@ vm_status_t vm_value_format(const vm_value_meta_t *meta,
     return status;
 }
 
+/**
+ * 函数说明：vm_value_to_double，执行本模块对应功能逻辑。
+ * 输入：meta：函数输入参数，参与本函数的计算、查找或状态更新。；data：输入或输出的原始字节缓冲区。；data_size：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_value_to_double(const vm_value_meta_t *meta,
                                const uint8_t *data,
                                size_t data_size,
@@ -772,6 +923,12 @@ vm_status_t vm_value_to_double(const vm_value_meta_t *meta,
     return status;
 }
 
+/**
+ * 函数说明：vm_value_encode_bit_field，编码数据到传输格式。
+ * 输入：meta：函数输入参数，参与本函数的计算、查找或状态更新。；current_data：函数输入参数，参与本函数的计算、查找或状态更新。；current_size：函数输入参数，参与本函数的计算、查找或状态更新。；input：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。；out_size：函数输入参数，参与本函数的计算、查找或状态更新。；written：函数输入参数，参与本函数的计算、查找或状态更新。；error：错误信息输出缓冲区。；error_size：错误信息缓冲区长度。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t vm_value_encode_bit_field(const vm_value_meta_t *meta,
                                              const uint8_t *current_data,
                                              size_t current_size,
@@ -861,6 +1018,12 @@ static vm_status_t vm_value_encode_bit_field(const vm_value_meta_t *meta,
     return status;
 }
 
+/**
+ * 函数说明：vm_value_encode，编码数据到传输格式。
+ * 输入：meta：函数输入参数，参与本函数的计算、查找或状态更新。；current_data：函数输入参数，参与本函数的计算、查找或状态更新。；current_size：函数输入参数，参与本函数的计算、查找或状态更新。；text：文本内容或输入字符串。；out：输出对象或结果指针，函数成功时写入有效值。；out_size：函数输入参数，参与本函数的计算、查找或状态更新。；written：函数输入参数，参与本函数的计算、查找或状态更新。；error：错误信息输出缓冲区。；error_size：错误信息缓冲区长度。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_value_encode(const vm_value_meta_t *meta,
                             const uint8_t *current_data,
                             size_t current_size,

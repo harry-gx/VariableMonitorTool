@@ -1,27 +1,53 @@
+/*
+ * 文件说明：ELF 文件读取实现，负责解析文件头、节表、字符串表和调试节。
+ * 所属模块：ELF/AXF 解析模块。
+ * 设计要点：正式业务逻辑集中在本文件或本模块内，测试代码位于 test 目录，第三方厂商头文件不在本次注释范围内。
+ */
+
 #include "vm_elf.h"
 #include "vm_reader.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+/* 类型说明：结构体保存模块状态、配置、变量描述或解析结果。 */
 struct vm_elf
 {
+    /* 变量说明：bytes，保存当前对象运行所需的状态、参数或缓存数据。 */
     uint8_t *bytes;
+    /* 变量说明：symbols，保存当前对象运行所需的状态、参数或缓存数据。 */
     vm_symbol_t *symbols;
+    /* 变量说明：count，当前元素数量。 */
     size_t count;
+    /* 变量说明：capacity，动态数组容量。 */
     size_t capacity;
+    /* 变量说明：has_debug，保存当前对象运行所需的状态、参数或缓存数据。 */
     int has_debug;
+    /* 变量说明：file_size，保存当前对象运行所需的状态、参数或缓存数据。 */
     size_t file_size;
 };
 vm_status_t vm_elf_parse(const void *, size_t, vm_elf_t **, vm_parse_error_t *);
+/* 类型说明：结构体保存模块状态、配置、变量描述或解析结果。 */
 typedef struct
 {
+    /* 变量说明：type，对象类型或事件类型。 */
     uint32_t type;
+    /* 变量说明：flags，保存当前对象运行所需的状态、参数或缓存数据。 */
     uint32_t flags;
+    /* 变量说明：offset，保存当前对象运行所需的状态、参数或缓存数据。 */
     uint32_t offset;
+    /* 变量说明：size，数据长度，单位为字节。 */
     uint32_t size;
+    /* 变量说明：link，链表节点，用于挂接到注册表或路由表。 */
     uint32_t link;
+    /* 变量说明：entry，保存当前对象运行所需的状态、参数或缓存数据。 */
     uint32_t entry;
 } section;
+/**
+ * 函数说明：u，执行本模块对应功能逻辑。
+ * 输入：r：函数输入参数，参与本函数的计算、查找或状态更新。；o：函数输入参数，参与本函数的计算、查找或状态更新。；w：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回执行结果，具体含义由调用方按接口约定解释。
+ */
 static uint32_t u(const vm_reader_t *r, size_t o, unsigned w)
 {
     uint64_t v = 0;
@@ -29,6 +55,12 @@ static uint32_t u(const vm_reader_t *r, size_t o, unsigned w)
     return (uint32_t)v;
 }
 
+/**
+ * 函数说明：vm_elf_parse_file，解析输入数据并生成内部结果。
+ * 输入：path：待加载的文件路径。；out：输出对象或结果指针，函数成功时写入有效值。；err：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t
 vm_elf_parse_file(const char *path, vm_elf_t **out, vm_parse_error_t *err)
 {
@@ -97,6 +129,12 @@ vm_elf_parse_file(const char *path, vm_elf_t **out, vm_parse_error_t *err)
     free(data);
     return s;
 }
+/**
+ * 函数说明：sec，执行本模块对应功能逻辑。
+ * 输入：r：函数输入参数，参与本函数的计算、查找或状态更新。；table：函数输入参数，参与本函数的计算、查找或状态更新。；index：列表索引或数组下标。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回执行结果，具体含义由调用方按接口约定解释。
+ */
 static section sec(const vm_reader_t *r, size_t table, size_t index)
 {
     size_t o = table + index * 40;
@@ -109,6 +147,12 @@ static section sec(const vm_reader_t *r, size_t table, size_t index)
     s.entry = u(r, o + 36, 4);
     return s;
 }
+/**
+ * 函数说明：vm_elf_close，关闭底层资源。
+ * 输入：e：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：无返回值。
+ */
 void vm_elf_close(vm_elf_t *e)
 {
     if (e)
@@ -118,6 +162,12 @@ void vm_elf_close(vm_elf_t *e)
         free(e);
     }
 }
+/**
+ * 函数说明：vm_elf_section，执行本模块对应功能逻辑。
+ * 输入：e：函数输入参数，参与本函数的计算、查找或状态更新。；name：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t
 vm_elf_section(const vm_elf_t *e, const char *name, vm_elf_section_view_t *out)
 {
@@ -160,14 +210,32 @@ vm_elf_section(const vm_elf_t *e, const char *name, vm_elf_section_view_t *out)
     }
     return VM_NOT_FOUND;
 }
+/**
+ * 函数说明：vm_elf_has_debug_info，执行本模块对应功能逻辑。
+ * 输入：e：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回整数结果，具体含义由调用场景决定。
+ */
 int vm_elf_has_debug_info(const vm_elf_t *e)
 {
     return e ? e->has_debug : 0;
 }
+/**
+ * 函数说明：vm_elf_symbol_count，执行本模块对应功能逻辑。
+ * 输入：e：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回数量、长度或索引值。
+ */
 size_t vm_elf_symbol_count(const vm_elf_t *e)
 {
     return e ? e->count : 0;
 }
+/**
+ * 函数说明：vm_elf_symbol_at，执行本模块对应功能逻辑。
+ * 输入：e：函数输入参数，参与本函数的计算、查找或状态更新。；i：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_elf_symbol_at(const vm_elf_t *e, size_t i, vm_symbol_t *out)
 {
     if (!e || !out)
@@ -181,10 +249,22 @@ vm_status_t vm_elf_symbol_at(const vm_elf_t *e, size_t i, vm_symbol_t *out)
     *out = e->symbols[i];
     return VM_OK;
 }
+/**
+ * 函数说明：vm_elf_variable_count，执行本模块对应功能逻辑。
+ * 输入：e：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回数量、长度或索引值。
+ */
 size_t vm_elf_variable_count(const vm_elf_t *e)
 {
     return e ? e->count : 0;
 }
+/**
+ * 函数说明：vm_elf_variable_at，执行本模块对应功能逻辑。
+ * 输入：e：函数输入参数，参与本函数的计算、查找或状态更新。；i：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t
 vm_elf_variable_at(const vm_elf_t *e, size_t i, vm_variable_view_t *out)
 {
@@ -207,6 +287,12 @@ vm_elf_variable_at(const vm_elf_t *e, size_t i, vm_variable_view_t *out)
     out->volatile_hint = 0;
     return VM_OK;
 }
+/**
+ * 函数说明：vm_elf_find_variable_by_address，查找匹配对象。
+ * 输入：e：函数输入参数，参与本函数的计算、查找或状态更新。；address：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_elf_find_variable_by_address(const vm_elf_t *e,
                                             uint64_t address,
                                             vm_variable_view_t *out)
@@ -228,6 +314,12 @@ vm_status_t vm_elf_find_variable_by_address(const vm_elf_t *e,
     }
     return VM_NOT_FOUND;
 }
+/**
+ * 函数说明：vm_elf_find_variable，查找匹配对象。
+ * 输入：e：函数输入参数，参与本函数的计算、查找或状态更新。；name：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_elf_find_variable(const vm_elf_t *e,
                                  const char *name,
                                  vm_variable_view_t *out)
@@ -249,6 +341,12 @@ vm_status_t vm_elf_find_variable(const vm_elf_t *e,
     }
     return VM_NOT_FOUND;
 }
+/**
+ * 函数说明：vm_elf_parse，解析输入数据并生成内部结果。
+ * 输入：bytes：函数输入参数，参与本函数的计算、查找或状态更新。；size：数据长度或缓冲区容量。；out：输出对象或结果指针，函数成功时写入有效值。；err：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_elf_parse(const void *bytes,
                          size_t size,
                          vm_elf_t **out,
@@ -276,6 +374,7 @@ vm_status_t vm_elf_parse(const void *bytes,
     r.data = bytes;
     r.size = size;
     r.big_endian = 0;
+/* 常量说明：FAIL(code, 用于配置协议长度、默认参数、缓冲区容量或编译开关。 */
 #define FAIL(code, off, msg)                                                   \
     do                                                                         \
     {                                                                          \

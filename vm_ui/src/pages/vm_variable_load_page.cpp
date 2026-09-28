@@ -1,9 +1,16 @@
+/*
+ * 文件说明：UI 界面模块Qt/C++ 实现文件。
+ * 所属模块：UI 界面模块。
+ * 设计要点：正式业务逻辑集中在本文件或本模块内，测试代码位于 test 目录，第三方厂商头文件不在本次注释范围内。
+ */
+
 #include "pages/vm_variable_load_page.h"
 
 #include <QtWidgets>
 
 #include "vm_ui_port.h"
 
+// 类型说明：枚举限定模块状态、事件或设备类型的取值范围。
 enum VariableLoadRoles {
     VariableLoadRoleTypeName = Qt::UserRole + 1,
     VariableLoadRoleMonitorable,
@@ -13,6 +20,10 @@ enum VariableLoadRoles {
     VariableLoadRoleBitSize
 };
 
+// 函数说明：QWidget，执行本模块对应功能逻辑。
+// 输入：parent：Qt 父对象指针。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回对象指针或缓冲区指针，返回 NULL 表示未找到或失败。
 VariableLoadPage::VariableLoadPage(QWidget *parent) : QWidget(parent) {
     auto *layout = new QVBoxLayout(this);
     auto *pathRow = new QHBoxLayout;
@@ -62,11 +73,19 @@ QTableWidget *VariableLoadPage::table() const { return table_; }
 QString VariableLoadPage::imagePath() const { return pathEdit_->text(); }
 void VariableLoadPage::setImagePath(const QString &path) { pathEdit_->setText(path); }
 
+// 函数说明：VariableLoadPage::clearVariables，执行本模块对应功能逻辑。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void VariableLoadPage::clearVariables() {
     QSignalBlocker blocker(table_);
     table_->setRowCount(0);
 }
 
+// 函数说明：VariableLoadPage::setVariables，执行本模块对应功能逻辑。
+// 输入：variables：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void VariableLoadPage::setVariables(const QVector<MonitorVariable> &variables) {
     QSignalBlocker blocker(table_);
     table_->setRowCount(variables.size());
@@ -118,6 +137,10 @@ void VariableLoadPage::setVariables(const QVector<MonitorVariable> &variables) {
     }
 }
 
+// 函数说明：VariableLoadPage::selectedVariables，执行本模块对应功能逻辑。
+// 输入：column：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 QVector<UiVariable> VariableLoadPage::selectedVariables(int column) const {
     QVector<UiVariable> result;
     for (int row = 0; row < table_->rowCount(); ++row) {
@@ -134,14 +157,26 @@ QVector<UiVariable> VariableLoadPage::selectedVariables(int column) const {
     return result;
 }
 
+// 函数说明：VariableLoadPage::selectedMonitorVariables，执行本模块对应功能逻辑。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 QVector<UiVariable> VariableLoadPage::selectedMonitorVariables() const {
     return selectedVariables(4);
 }
 
+// 函数说明：VariableLoadPage::selectedCalibrationVariables，执行本模块对应功能逻辑。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 QVector<UiVariable> VariableLoadPage::selectedCalibrationVariables() const {
     return selectedVariables(5);
 }
 
+// 函数说明：VariableLoadPage::selectionJson，执行本模块对应功能逻辑。
+// 输入：无。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 QJsonArray VariableLoadPage::selectionJson() const {
     QJsonArray selected;
     for (int row = 0; row < table_->rowCount(); ++row) {
@@ -159,6 +194,10 @@ QJsonArray VariableLoadPage::selectionJson() const {
     return selected;
 }
 
+// 函数说明：VariableLoadPage::applySelection，执行本模块对应功能逻辑。
+// 输入：selection：函数输入参数，参与本函数的计算、查找或状态更新。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：无返回值。
 void VariableLoadPage::applySelection(const QJsonArray &selection) {
     QSignalBlocker blocker(table_);
     for (const auto &value : selection) {
@@ -179,26 +218,50 @@ void VariableLoadPage::applySelection(const QJsonArray &selection) {
     }
 }
 
+// 函数说明：VariableLoadPage::nameAt，执行本模块对应功能逻辑。
+// 输入：row：界面表格行号。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 Qt 字符串结果。
 QString VariableLoadPage::nameAt(int row) const {
     return table_->item(row, 0) ? table_->item(row, 0)->text() : QString();
 }
 
+// 函数说明：VariableLoadPage::addressAt，执行本模块对应功能逻辑。
+// 输入：row：界面表格行号。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 Qt 字符串结果。
 QString VariableLoadPage::addressAt(int row) const {
     return table_->item(row, 1) ? table_->item(row, 1)->text() : QString();
 }
 
+// 函数说明：VariableLoadPage::typeNameAt，执行本模块对应功能逻辑。
+// 输入：row：界面表格行号。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 Qt 字符串结果。
 QString VariableLoadPage::typeNameAt(int row) const {
     return table_->item(row, 0) ? table_->item(row, 0)->data(VariableLoadRoleTypeName).toString() : QString();
 }
 
+// 函数说明：VariableLoadPage::bitFieldAt，执行本模块对应功能逻辑。
+// 输入：row：界面表格行号。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回 true 表示成功或条件成立，返回 false 表示失败或条件不成立。
 bool VariableLoadPage::bitFieldAt(int row) const {
     return table_->item(row, 0) ? table_->item(row, 0)->data(VariableLoadRoleBitField).toBool() : false;
 }
 
+// 函数说明：VariableLoadPage::bitOffsetAt，执行本模块对应功能逻辑。
+// 输入：row：界面表格行号。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 quint8 VariableLoadPage::bitOffsetAt(int row) const {
     return table_->item(row, 0) ? static_cast<quint8>(table_->item(row, 0)->data(VariableLoadRoleBitOffset).toUInt()) : 0;
 }
 
+// 函数说明：VariableLoadPage::bitSizeAt，执行本模块对应功能逻辑。
+// 输入：row：界面表格行号。
+// 输出：通过返回值、对象成员或输出参数反馈处理结果。
+// 返回：返回执行结果，具体含义由调用方按接口约定解释。
 quint8 VariableLoadPage::bitSizeAt(int row) const {
     return table_->item(row, 0) ? static_cast<quint8>(table_->item(row, 0)->data(VariableLoadRoleBitSize).toUInt()) : 0;
 }

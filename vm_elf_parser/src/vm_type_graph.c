@@ -1,18 +1,37 @@
+/*
+ * 文件说明：DWARF 类型图构建和类型展开实现，用于还原基础类型、指针、数组、结构体、联合体和枚举。
+ * 所属模块：ELF/AXF 解析模块。
+ * 设计要点：正式业务逻辑集中在本文件或本模块内，测试代码位于 test 目录，第三方厂商头文件不在本次注释范围内。
+ */
+
 #include "vm_type_graph.h"
 #include "vm_dwarf_values.h"
 #include <stdlib.h>
 #include <string.h>
 
+/* 类型说明：结构体保存模块状态、配置、变量描述或解析结果。 */
 struct vm_type_graph
 {
+    /* 变量说明：items，动态数组首地址。 */
     vm_type_node_view_t *items;
+    /* 变量说明：count，当前元素数量。 */
     size_t count;
+    /* 变量说明：capacity，动态数组容量。 */
     size_t capacity;
+    /* 变量说明：variables，保存当前对象运行所需的状态、参数或缓存数据。 */
     size_t variables;
+    /* 变量说明：static_addresses，保存当前对象运行所需的状态、参数或缓存数据。 */
     size_t static_addresses;
+    /* 变量说明：c_lower_bound，保存当前对象运行所需的状态、参数或缓存数据。 */
     int c_lower_bound;
 };
 
+/**
+ * 函数说明：node_kind，执行本模块对应功能逻辑。
+ * 输入：tag：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回执行结果，具体含义由调用方按接口约定解释。
+ */
 static vm_type_kind_t node_kind(uint64_t tag)
 {
     switch (tag)
@@ -48,6 +67,12 @@ static vm_type_kind_t node_kind(uint64_t tag)
     }
 }
 
+/**
+ * 函数说明：vm_type_graph_destroy，销毁对象并释放相关资源。
+ * 输入：g：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：无返回值。
+ */
 void vm_type_graph_destroy(vm_type_graph_t *g)
 {
     size_t i;
@@ -64,6 +89,12 @@ void vm_type_graph_destroy(vm_type_graph_t *g)
 }
 
 /* Signed bounds outside int64 are deliberately not inferred. */
+/**
+ * 函数说明：bound，执行本模块对应功能逻辑。
+ * 输入：a：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回整数结果，具体含义由调用场景决定。
+ */
 static int bound(const vm_dwarf_value_t *a, int64_t *out)
 {
     if (!a)
@@ -83,6 +114,12 @@ static int bound(const vm_dwarf_value_t *a, int64_t *out)
     return 0;
 }
 
+/**
+ * 函数说明：collect，执行本模块对应功能逻辑。
+ * 输入：context：回调上下文指针，由调用方传入并在回调中原样返回。；die：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t collect(void *context, const vm_dwarf_die_view_t *die)
 {
     vm_type_graph_t *g = context;
@@ -280,6 +317,12 @@ static vm_status_t collect(void *context, const vm_dwarf_die_view_t *die)
     return VM_OK;
 }
 
+/**
+ * 函数说明：vm_type_graph_build，执行本模块对应功能逻辑。
+ * 输入：sections：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。；error：错误信息输出缓冲区。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_type_graph_build(const vm_dwarf_sections_t *sections,
                                 vm_type_graph_t **out,
                                 vm_dwarf_error_t *error)
@@ -310,19 +353,43 @@ vm_status_t vm_type_graph_build(const vm_dwarf_sections_t *sections,
     return VM_OK;
 }
 
+/**
+ * 函数说明：vm_type_graph_count，执行本模块对应功能逻辑。
+ * 输入：g：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回数量、长度或索引值。
+ */
 size_t vm_type_graph_count(const vm_type_graph_t *g)
 {
     return g ? g->count : 0;
 }
+/**
+ * 函数说明：vm_type_graph_variable_count，执行本模块对应功能逻辑。
+ * 输入：g：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回数量、长度或索引值。
+ */
 size_t vm_type_graph_variable_count(const vm_type_graph_t *g)
 {
     return g ? g->variables : 0;
 }
+/**
+ * 函数说明：vm_type_graph_static_address_count，执行本模块对应功能逻辑。
+ * 输入：g：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回数量、长度或索引值。
+ */
 size_t vm_type_graph_static_address_count(const vm_type_graph_t *g)
 {
     return g ? g->static_addresses : 0;
 }
 
+/**
+ * 函数说明：vm_type_graph_at，执行本模块对应功能逻辑。
+ * 输入：g：函数输入参数，参与本函数的计算、查找或状态更新。；i：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t
 vm_type_graph_at(const vm_type_graph_t *g, size_t i, vm_type_node_view_t *out)
 {
@@ -337,6 +404,12 @@ vm_type_graph_at(const vm_type_graph_t *g, size_t i, vm_type_node_view_t *out)
     *out = g->items[i];
     return VM_OK;
 }
+/**
+ * 函数说明：vm_type_graph_find_die，查找匹配对象。
+ * 输入：g：函数输入参数，参与本函数的计算、查找或状态更新。；offset：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_type_graph_find_die(const vm_type_graph_t *g,
                                    uint64_t offset,
                                    vm_type_node_view_t *out)
@@ -368,6 +441,12 @@ vm_status_t vm_type_graph_find_die(const vm_type_graph_t *g,
     *out = g->items[lo];
     return VM_OK;
 }
+/**
+ * 函数说明：vm_type_graph_variable_at，执行本模块对应功能逻辑。
+ * 输入：g：函数输入参数，参与本函数的计算、查找或状态更新。；index：列表索引或数组下标。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_type_graph_variable_at(const vm_type_graph_t *g,
                                       size_t index,
                                       vm_type_node_view_t *out)
@@ -387,6 +466,12 @@ vm_status_t vm_type_graph_variable_at(const vm_type_graph_t *g,
     }
     return VM_NOT_FOUND;
 }
+/**
+ * 函数说明：vm_type_graph_find_variable，查找匹配对象。
+ * 输入：g：函数输入参数，参与本函数的计算、查找或状态更新。；name：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_type_graph_find_variable(const vm_type_graph_t *g,
                                         const char *name,
                                         vm_type_node_view_t *out)
@@ -407,6 +492,12 @@ vm_status_t vm_type_graph_find_variable(const vm_type_graph_t *g,
     }
     return VM_NOT_FOUND;
 }
+/**
+ * 函数说明：vm_type_graph_find_variable_by_address，查找匹配对象。
+ * 输入：g：函数输入参数，参与本函数的计算、查找或状态更新。；address：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_type_graph_find_variable_by_address(const vm_type_graph_t *g,
                                                    uint64_t address,
                                                    vm_type_node_view_t *out)
@@ -428,6 +519,12 @@ vm_status_t vm_type_graph_find_variable_by_address(const vm_type_graph_t *g,
     }
     return VM_NOT_FOUND;
 }
+/**
+ * 函数说明：vm_type_graph_find_variable_containing，查找匹配对象。
+ * 输入：g：函数输入参数，参与本函数的计算、查找或状态更新。；address：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_type_graph_find_variable_containing(const vm_type_graph_t *g,
                                                    uint64_t address,
                                                    vm_type_node_view_t *out)
@@ -458,6 +555,12 @@ vm_status_t vm_type_graph_find_variable_containing(const vm_type_graph_t *g,
     }
     return VM_NOT_FOUND;
 }
+/**
+ * 函数说明：vm_type_graph_member_count，执行本模块对应功能逻辑。
+ * 输入：g：函数输入参数，参与本函数的计算、查找或状态更新。；aggregate_die：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回数量、长度或索引值。
+ */
 size_t vm_type_graph_member_count(const vm_type_graph_t *g,
                                   uint64_t aggregate_die)
 {
@@ -477,6 +580,12 @@ size_t vm_type_graph_member_count(const vm_type_graph_t *g,
     }
     return n;
 }
+/**
+ * 函数说明：vm_type_graph_member_at，执行本模块对应功能逻辑。
+ * 输入：g：函数输入参数，参与本函数的计算、查找或状态更新。；aggregate_die：函数输入参数，参与本函数的计算、查找或状态更新。；index：列表索引或数组下标。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_type_graph_member_at(const vm_type_graph_t *g,
                                     uint64_t aggregate_die,
                                     size_t index,
@@ -502,6 +611,12 @@ vm_status_t vm_type_graph_member_at(const vm_type_graph_t *g,
     }
     return VM_NOT_FOUND;
 }
+/**
+ * 函数说明：vm_type_graph_find_member_containing，查找匹配对象。
+ * 输入：g：函数输入参数，参与本函数的计算、查找或状态更新。；aggregate_die：函数输入参数，参与本函数的计算、查找或状态更新。；offset：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_type_graph_find_member_containing(const vm_type_graph_t *g,
                                                  uint64_t aggregate_die,
                                                  uint64_t offset,
@@ -533,6 +648,12 @@ vm_status_t vm_type_graph_find_member_containing(const vm_type_graph_t *g,
     }
     return VM_NOT_FOUND;
 }
+/**
+ * 函数说明：vm_type_graph_find_enumerator，查找匹配对象。
+ * 输入：g：函数输入参数，参与本函数的计算、查找或状态更新。；enum_die：函数输入参数，参与本函数的计算、查找或状态更新。；name：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_type_graph_find_enumerator(const vm_type_graph_t *g,
                                           uint64_t enum_die,
                                           const char *name,
@@ -561,6 +682,12 @@ vm_status_t vm_type_graph_find_enumerator(const vm_type_graph_t *g,
     }
     return VM_NOT_FOUND;
 }
+/**
+ * 函数说明：vm_type_graph_find_enumerator_by_value，查找匹配对象。
+ * 输入：g：函数输入参数，参与本函数的计算、查找或状态更新。；enum_die：函数输入参数，参与本函数的计算、查找或状态更新。；value：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_type_graph_find_enumerator_by_value(const vm_type_graph_t *g,
                                                    uint64_t enum_die,
                                                    int64_t value,
@@ -583,6 +710,12 @@ vm_status_t vm_type_graph_find_enumerator_by_value(const vm_type_graph_t *g,
     }
     return VM_NOT_FOUND;
 }
+/**
+ * 函数说明：vm_type_graph_enumerator_count，执行本模块对应功能逻辑。
+ * 输入：g：函数输入参数，参与本函数的计算、查找或状态更新。；enum_die：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回数量、长度或索引值。
+ */
 size_t vm_type_graph_enumerator_count(const vm_type_graph_t *g,
                                       uint64_t enum_die)
 {
@@ -602,6 +735,12 @@ size_t vm_type_graph_enumerator_count(const vm_type_graph_t *g,
     }
     return count;
 }
+/**
+ * 函数说明：vm_type_graph_enumerator_at，执行本模块对应功能逻辑。
+ * 输入：g：函数输入参数，参与本函数的计算、查找或状态更新。；enum_die：函数输入参数，参与本函数的计算、查找或状态更新。；index：列表索引或数组下标。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_type_graph_enumerator_at(const vm_type_graph_t *g,
                                         uint64_t enum_die,
                                         size_t index,
@@ -624,6 +763,12 @@ vm_status_t vm_type_graph_enumerator_at(const vm_type_graph_t *g,
     return VM_NOT_FOUND;
 }
 
+/**
+ * 函数说明：transparent，执行本模块对应功能逻辑。
+ * 输入：kind：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回整数结果，具体含义由调用场景决定。
+ */
 static int transparent(vm_type_kind_t kind)
 {
     return kind == VM_TYPE_VARIABLE || kind == VM_TYPE_MEMBER ||
@@ -631,6 +776,12 @@ static int transparent(vm_type_kind_t kind)
            kind == VM_TYPE_VOLATILE;
 }
 
+/**
+ * 函数说明：vm_type_graph_resolve，执行本模块对应功能逻辑。
+ * 输入：g：函数输入参数，参与本函数的计算、查找或状态更新。；offset：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_type_graph_resolve(const vm_type_graph_t *g,
                                   uint64_t offset,
                                   vm_type_resolution_t *out)
@@ -676,6 +827,12 @@ vm_status_t vm_type_graph_resolve(const vm_type_graph_t *g,
     return g->count ? VM_FORMAT : VM_NOT_FOUND;
 }
 
+/**
+ * 函数说明：vm_type_graph_dimension_count，执行本模块对应功能逻辑。
+ * 输入：g：函数输入参数，参与本函数的计算、查找或状态更新。；array：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回数量、长度或索引值。
+ */
 size_t vm_type_graph_dimension_count(const vm_type_graph_t *g, uint64_t array)
 {
     size_t i;
@@ -695,6 +852,12 @@ size_t vm_type_graph_dimension_count(const vm_type_graph_t *g, uint64_t array)
     return count;
 }
 
+/**
+ * 函数说明：vm_type_graph_dimension_at，执行本模块对应功能逻辑。
+ * 输入：g：函数输入参数，参与本函数的计算、查找或状态更新。；array：函数输入参数，参与本函数的计算、查找或状态更新。；index：列表索引或数组下标。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_type_graph_dimension_at(const vm_type_graph_t *g,
                                        uint64_t array,
                                        size_t index,
@@ -717,6 +880,12 @@ vm_status_t vm_type_graph_dimension_at(const vm_type_graph_t *g,
     return VM_NOT_FOUND;
 }
 
+/**
+ * 函数说明：vm_type_graph_array_count，执行本模块对应功能逻辑。
+ * 输入：g：函数输入参数，参与本函数的计算、查找或状态更新。；array：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_type_graph_array_count(const vm_type_graph_t *g,
                                       uint64_t array,
                                       uint64_t *out)
@@ -765,6 +934,12 @@ vm_status_t vm_type_graph_array_count(const vm_type_graph_t *g,
     return VM_OK;
 }
 
+/**
+ * 函数说明：vm_type_graph_sizeof，执行本模块对应功能逻辑。
+ * 输入：g：函数输入参数，参与本函数的计算、查找或状态更新。；offset：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t
 vm_type_graph_sizeof(const vm_type_graph_t *g, uint64_t offset, uint64_t *out)
 {

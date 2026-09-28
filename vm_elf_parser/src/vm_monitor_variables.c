@@ -1,3 +1,9 @@
+/*
+ * 文件说明：监控变量提取主流程，负责从 ELF/DWARF 类型信息展开变量、成员、数组和位字段。
+ * 所属模块：ELF/AXF 解析模块。
+ * 设计要点：正式业务逻辑集中在本文件或本模块内，测试代码位于 test 目录，第三方厂商头文件不在本次注释范围内。
+ */
+
 #include "vm_monitor_variables.h"
 
 #include <stdio.h>
@@ -7,27 +13,47 @@
 #include "vm_elf.h"
 #include "vm_type_graph.h"
 
+/* 常量说明：VM_MONITOR_MAX_DEPTH 用于配置协议长度、默认参数、缓冲区容量或编译开关。 */
 #define VM_MONITOR_MAX_DEPTH (6u)
+/* 常量说明：VM_MONITOR_MAX_DIMS 用于配置协议长度、默认参数、缓冲区容量或编译开关。 */
 #define VM_MONITOR_MAX_DIMS (8u)
+/* 常量说明：VM_MONITOR_INITIAL_CAP 用于配置协议长度、默认参数、缓冲区容量或编译开关。 */
 #define VM_MONITOR_INITIAL_CAP (64u)
 
+/* 类型说明：结构体保存模块状态、配置、变量描述或解析结果。 */
 typedef struct
 {
+    /* 变量说明：name，变量名、页面名或节点名。 */
     char name[VM_MONITOR_TYPE_NAME_MAX];
+    /* 变量说明：kind，保存当前对象运行所需的状态、参数或缓存数据。 */
     vm_type_kind_t kind;
+    /* 变量说明：size，数据长度，单位为字节。 */
     uint64_t size;
+    /* 变量说明：die_offset，保存当前对象运行所需的状态、参数或缓存数据。 */
     uint64_t die_offset;
+    /* 变量说明：has_size，保存当前对象运行所需的状态、参数或缓存数据。 */
     uint8_t has_size;
+    /* 变量说明：is_const，保存当前对象运行所需的状态、参数或缓存数据。 */
     uint8_t is_const;
 } vm_resolved_type_info_t;
 
+/* 类型说明：结构体保存模块状态、配置、变量描述或解析结果。 */
 struct vm_monitor_variable_list
 {
+    /* 变量说明：items，动态数组首地址。 */
     vm_monitor_variable_t *items;
+    /* 变量说明：count，当前元素数量。 */
     size_t count;
+    /* 变量说明：capacity，动态数组容量。 */
     size_t capacity;
 };
 
+/**
+ * 函数说明：vm_monitor_set_error，执行本模块对应功能逻辑。
+ * 输入：error：错误信息输出缓冲区。；error_size：错误信息缓冲区长度。；message：协议解析后的消息对象。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：无返回值。
+ */
 static void
 vm_monitor_set_error(char *error, size_t error_size, const char *message)
 {
@@ -43,6 +69,12 @@ vm_monitor_set_error(char *error, size_t error_size, const char *message)
     }
 }
 
+/**
+ * 函数说明：vm_monitor_copy_text，复制文本或结构化数据。
+ * 输入：dst：函数输入参数，参与本函数的计算、查找或状态更新。；dst_size：函数输入参数，参与本函数的计算、查找或状态更新。；src：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：无返回值。
+ */
 static void vm_monitor_copy_text(char *dst, size_t dst_size, const char *src)
 {
     size_t index;
@@ -70,6 +102,12 @@ static void vm_monitor_copy_text(char *dst, size_t dst_size, const char *src)
     dst[index] = '\0';
 }
 
+/**
+ * 函数说明：vm_monitor_append_text，追加数据到目标容器。
+ * 输入：dst：函数输入参数，参与本函数的计算、查找或状态更新。；dst_size：函数输入参数，参与本函数的计算、查找或状态更新。；src：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t
 vm_monitor_append_text(char *dst, size_t dst_size, const char *src)
 {
@@ -112,6 +150,12 @@ vm_monitor_append_text(char *dst, size_t dst_size, const char *src)
     return status;
 }
 
+/**
+ * 函数说明：vm_monitor_make_member_name，执行本模块对应功能逻辑。
+ * 输入：out：输出对象或结果指针，函数成功时写入有效值。；out_size：函数输入参数，参与本函数的计算、查找或状态更新。；parent：Qt 父对象指针。；member：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t vm_monitor_make_member_name(char *out,
                                                size_t out_size,
                                                const char *parent,
@@ -140,6 +184,12 @@ static vm_status_t vm_monitor_make_member_name(char *out,
     return status;
 }
 
+/**
+ * 函数说明：vm_monitor_make_array_name，执行本模块对应功能逻辑。
+ * 输入：out：输出对象或结果指针，函数成功时写入有效值。；out_size：函数输入参数，参与本函数的计算、查找或状态更新。；parent：Qt 父对象指针。；index：列表索引或数组下标。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t vm_monitor_make_array_name(char *out,
                                               size_t out_size,
                                               const char *parent,
@@ -191,27 +241,57 @@ static vm_status_t vm_monitor_make_array_name(char *out,
     return status;
 }
 
+/**
+ * 函数说明：vm_monitor_is_scalar_type，执行本模块对应功能逻辑。
+ * 输入：kind：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 1 表示条件成立或状态有效，返回 0 表示条件不成立。
+ */
 static uint8_t vm_monitor_is_scalar_type(vm_type_kind_t kind)
 {
     return (uint8_t)((kind == VM_TYPE_BASE) || (kind == VM_TYPE_ENUM));
 }
 
+/**
+ * 函数说明：vm_monitor_is_aggregate_type，执行本模块对应功能逻辑。
+ * 输入：kind：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 1 表示条件成立或状态有效，返回 0 表示条件不成立。
+ */
 static uint8_t vm_monitor_is_aggregate_type(vm_type_kind_t kind)
 {
     return (uint8_t)((kind == VM_TYPE_STRUCT) || (kind == VM_TYPE_UNION));
 }
 
+/**
+ * 函数说明：vm_monitor_is_array_type，执行本模块对应功能逻辑。
+ * 输入：kind：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 1 表示条件成立或状态有效，返回 0 表示条件不成立。
+ */
 static uint8_t vm_monitor_is_array_type(vm_type_kind_t kind)
 {
     return (uint8_t)(kind == VM_TYPE_ARRAY);
 }
 
+/**
+ * 函数说明：vm_monitor_is_expandable_type，执行本模块对应功能逻辑。
+ * 输入：kind：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 1 表示条件成立或状态有效，返回 0 表示条件不成立。
+ */
 static uint8_t vm_monitor_is_expandable_type(vm_type_kind_t kind)
 {
     return (uint8_t)((vm_monitor_is_aggregate_type(kind) != 0u) ||
                      (vm_monitor_is_array_type(kind) != 0u));
 }
 
+/**
+ * 函数说明：vm_monitor_reserve，执行本模块对应功能逻辑。
+ * 输入：list：变量列表或节点列表对象。；needed：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t vm_monitor_reserve(vm_monitor_variable_list_t *list,
                                       size_t needed)
 {
@@ -267,6 +347,12 @@ static vm_status_t vm_monitor_reserve(vm_monitor_variable_list_t *list,
     return status;
 }
 
+/**
+ * 函数说明：vm_monitor_push，执行本模块对应功能逻辑。
+ * 输入：list：变量列表或节点列表对象。；item：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t vm_monitor_push(vm_monitor_variable_list_t *list,
                                    const vm_monitor_variable_t *item)
 {
@@ -286,6 +372,12 @@ static vm_status_t vm_monitor_push(vm_monitor_variable_list_t *list,
     return status;
 }
 
+/**
+ * 函数说明：vm_monitor_load_dwarf_sections，加载外部文件或配置。
+ * 输入：elf：函数输入参数，参与本函数的计算、查找或状态更新。；sections：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 1 表示条件成立或状态有效，返回 0 表示条件不成立。
+ */
 static uint8_t vm_monitor_load_dwarf_sections(vm_elf_t *elf,
                                               vm_dwarf_sections_t *sections)
 {
@@ -327,6 +419,12 @@ static uint8_t vm_monitor_load_dwarf_sections(vm_elf_t *elf,
     return result;
 }
 
+/**
+ * 函数说明：vm_monitor_find_debug_variable，查找匹配对象。
+ * 输入：graph：函数输入参数，参与本函数的计算、查找或状态更新。；variable：变量描述信息，包含变量名、类型、地址、长度和权限。；node：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 1 表示条件成立或状态有效，返回 0 表示条件不成立。
+ */
 static uint8_t
 vm_monitor_find_debug_variable(const vm_type_graph_t *graph,
                                const vm_variable_view_t *variable,
@@ -357,6 +455,12 @@ vm_monitor_find_debug_variable(const vm_type_graph_t *graph,
     return result;
 }
 
+/**
+ * 函数说明：vm_monitor_type_name_from_resolved，执行本模块对应功能逻辑。
+ * 输入：resolved：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。；out_size：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：无返回值。
+ */
 static void vm_monitor_type_name_from_resolved(
     const vm_type_resolution_t *resolved, char *out, size_t out_size)
 {
@@ -435,6 +539,12 @@ static void vm_monitor_type_name_from_resolved(
     }
 }
 
+/**
+ * 函数说明：vm_monitor_resolve_type_info，执行本模块对应功能逻辑。
+ * 输入：graph：函数输入参数，参与本函数的计算、查找或状态更新。；die_offset：函数输入参数，参与本函数的计算、查找或状态更新。；info：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 1 表示条件成立或状态有效，返回 0 表示条件不成立。
+ */
 static uint8_t vm_monitor_resolve_type_info(const vm_type_graph_t *graph,
                                             uint64_t die_offset,
                                             vm_resolved_type_info_t *info)
@@ -478,6 +588,12 @@ static uint8_t vm_monitor_resolve_type_info(const vm_type_graph_t *graph,
     return result;
 }
 
+/**
+ * 函数说明：vm_monitor_make_variable，执行本模块对应功能逻辑。
+ * 输入：name：函数输入参数，参与本函数的计算、查找或状态更新。；address：函数输入参数，参与本函数的计算、查找或状态更新。；size：数据长度或缓冲区容量。；writable：函数输入参数，参与本函数的计算、查找或状态更新。；type_info：函数输入参数，参与本函数的计算、查找或状态更新。；bit_field：函数输入参数，参与本函数的计算、查找或状态更新。；bit_offset：函数输入参数，参与本函数的计算、查找或状态更新。；bit_size：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回执行结果，具体含义由调用方按接口约定解释。
+ */
 static vm_monitor_variable_t
 vm_monitor_make_variable(const char *name,
                          uint64_t address,
@@ -532,6 +648,12 @@ vm_monitor_append_typed_variable(vm_monitor_variable_list_t *list,
                                  uint8_t include_self,
                                  uint32_t depth);
 
+/**
+ * 函数说明：vm_monitor_array_dimensions，执行本模块对应功能逻辑。
+ * 输入：graph：函数输入参数，参与本函数的计算、查找或状态更新。；array_die：函数输入参数，参与本函数的计算、查找或状态更新。；dimensions：函数输入参数，参与本函数的计算、查找或状态更新。；dimension_count：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 1 表示条件成立或状态有效，返回 0 表示条件不成立。
+ */
 static uint8_t vm_monitor_array_dimensions(const vm_type_graph_t *graph,
                                            uint64_t array_die,
                                            uint64_t *dimensions,
@@ -572,6 +694,12 @@ static uint8_t vm_monitor_array_dimensions(const vm_type_graph_t *graph,
     return result;
 }
 
+/**
+ * 函数说明：vm_monitor_trailing_element_count，执行本模块对应功能逻辑。
+ * 输入：dimensions：函数输入参数，参与本函数的计算、查找或状态更新。；dimension_count：函数输入参数，参与本函数的计算、查找或状态更新。；next_dimension：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回执行结果，具体含义由调用方按接口约定解释。
+ */
 static uint64_t vm_monitor_trailing_element_count(const uint64_t *dimensions,
                                                   size_t dimension_count,
                                                   size_t next_dimension)
@@ -683,6 +811,12 @@ vm_monitor_append_array_elements(vm_monitor_variable_list_t *list,
     return status;
 }
 
+/**
+ * 函数说明：vm_monitor_compute_bit_field_access，执行本模块对应功能逻辑。
+ * 输入：member：函数输入参数，参与本函数的计算、查找或状态更新。；member_type：函数输入参数，参与本函数的计算、查找或状态更新。；parent_address：函数输入参数，参与本函数的计算、查找或状态更新。；aggregate_offset：函数输入参数，参与本函数的计算、查找或状态更新。；address：函数输入参数，参与本函数的计算、查找或状态更新。；size：数据长度或缓冲区容量。；bit_offset：函数输入参数，参与本函数的计算、查找或状态更新。；bit_size：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 1 表示条件成立或状态有效，返回 0 表示条件不成立。
+ */
 static uint8_t
 vm_monitor_compute_bit_field_access(const vm_type_node_view_t *member,
                                     const vm_resolved_type_info_t *member_type,
@@ -748,6 +882,12 @@ vm_monitor_compute_bit_field_access(const vm_type_node_view_t *member,
     return result;
 }
 
+/**
+ * 函数说明：vm_monitor_append_aggregate_members，追加数据到目标容器。
+ * 输入：list：变量列表或节点列表对象。；graph：函数输入参数，参与本函数的计算、查找或状态更新。；parent_name：函数输入参数，参与本函数的计算、查找或状态更新。；parent_address：函数输入参数，参与本函数的计算、查找或状态更新。；aggregate_die：函数输入参数，参与本函数的计算、查找或状态更新。；aggregate_kind：函数输入参数，参与本函数的计算、查找或状态更新。；parent_writable：函数输入参数，参与本函数的计算、查找或状态更新。；depth：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t
 vm_monitor_append_aggregate_members(vm_monitor_variable_list_t *list,
                                     const vm_type_graph_t *graph,
@@ -878,6 +1018,12 @@ vm_monitor_append_aggregate_members(vm_monitor_variable_list_t *list,
     return status;
 }
 
+/**
+ * 函数说明：vm_monitor_append_typed_variable，追加数据到目标容器。
+ * 输入：list：变量列表或节点列表对象。；graph：函数输入参数，参与本函数的计算、查找或状态更新。；name：函数输入参数，参与本函数的计算、查找或状态更新。；address：函数输入参数，参与本函数的计算、查找或状态更新。；fallback_size：函数输入参数，参与本函数的计算、查找或状态更新。；writable：函数输入参数，参与本函数的计算、查找或状态更新。；die_offset：函数输入参数，参与本函数的计算、查找或状态更新。；include_self：函数输入参数，参与本函数的计算、查找或状态更新。；depth：函数输入参数，参与本函数的计算、查找或状态更新。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 static vm_status_t
 vm_monitor_append_typed_variable(vm_monitor_variable_list_t *list,
                                  const vm_type_graph_t *graph,
@@ -972,6 +1118,12 @@ vm_monitor_append_typed_variable(vm_monitor_variable_list_t *list,
     return status;
 }
 
+/**
+ * 函数说明：vm_monitor_variable_list_destroy，销毁对象并释放相关资源。
+ * 输入：list：变量列表或节点列表对象。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：无返回值。
+ */
 void vm_monitor_variable_list_destroy(vm_monitor_variable_list_t *list)
 {
     if (list != NULL)
@@ -981,6 +1133,12 @@ void vm_monitor_variable_list_destroy(vm_monitor_variable_list_t *list)
     }
 }
 
+/**
+ * 函数说明：vm_monitor_variable_count，执行本模块对应功能逻辑。
+ * 输入：list：变量列表或节点列表对象。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回数量、长度或索引值。
+ */
 size_t vm_monitor_variable_count(const vm_monitor_variable_list_t *list)
 {
     size_t count;
@@ -994,6 +1152,12 @@ size_t vm_monitor_variable_count(const vm_monitor_variable_list_t *list)
     return count;
 }
 
+/**
+ * 函数说明：vm_monitor_variable_at，执行本模块对应功能逻辑。
+ * 输入：list：变量列表或节点列表对象。；index：列表索引或数组下标。；out：输出对象或结果指针，函数成功时写入有效值。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_monitor_variable_at(const vm_monitor_variable_list_t *list,
                                    size_t index,
                                    vm_monitor_variable_t *out)
@@ -1017,6 +1181,12 @@ vm_status_t vm_monitor_variable_at(const vm_monitor_variable_list_t *list,
     return status;
 }
 
+/**
+ * 函数说明：vm_monitor_variables_load，加载外部文件或配置。
+ * 输入：path：待加载的文件路径。；out：输出对象或结果指针，函数成功时写入有效值。；error：错误信息输出缓冲区。；error_size：错误信息缓冲区长度。
+ * 输出：通过返回值、对象成员或输出参数反馈处理结果。
+ * 返回：返回 VM_OK 表示成功，其它状态码表示参数错误、资源不足、忙碌或底层失败。
+ */
 vm_status_t vm_monitor_variables_load(const char *path,
                                       vm_monitor_variable_list_t **out,
                                       char *error,
@@ -1072,6 +1242,7 @@ vm_status_t vm_monitor_variables_load(const char *path,
         {
             if (vm_monitor_load_dwarf_sections(elf, &sections) != 0u)
             {
+                /* 关键步骤：用 DWARF 调试节构建类型图，后续变量、结构体成员、数组元素和位字段都从类型图展开。 */
                 if (vm_type_graph_build(&sections, &type_graph, &dwarf_error) !=
                     VM_OK)
                 {
@@ -1135,6 +1306,7 @@ vm_status_t vm_monitor_variables_load(const char *path,
 
     vm_monitor_variable_list_destroy(list);
     vm_type_graph_destroy(type_graph);
+    /* 关键步骤：变量列表已拷贝必要信息，解析结束后释放 ELF 和类型图临时对象。 */
     vm_elf_close(elf);
 
     return status;
