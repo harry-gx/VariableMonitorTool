@@ -13,12 +13,10 @@
 #include "vm_value_codec.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #define VM_COMM_PAYLOAD_MAX (1024u)
 #define VM_COMM_PENDING_MAX (32u)
-#define VM_COMM_RX_BUFFER_SIZE (2048u)
 #define VM_COMM_DEFAULT_DATA_BITS (8u)
 #define VM_COMM_DEFAULT_STOP_BITS (1u)
 #define VM_COMM_DEFAULT_BAUDRATE (115200u)
@@ -59,6 +57,7 @@ struct vm_comm
     vm_serial_if_t *serial_if;
     vm_mcal_serial_device_t *serial_device;
     vm_pdur_t *pdur;
+    vm_pdur_lower_route_t *serial_route;
     vm_service_manager_t *services;
     vm_comm_event_fn callback;
     void *callback_context;
@@ -70,26 +69,52 @@ struct vm_comm
     vm_comm_pending_t pending[VM_COMM_PENDING_MAX];
 };
 
+/* 变量说明：COM 静态通信对象，UI 当前只需要一个通信实例。 */
+static vm_comm_t g_vm_comm_instance;
+/* 变量说明：COM 静态对象占用标志，防止重复创建同一个通信实例。 */
+static uint8_t g_vm_comm_instance_used;
+
+/* 变量说明：串口下层路由静态节点，删除下方路由表项即可禁用串口通道。 */
+static vm_pdur_lower_route_t g_vm_comm_serial_route;
+
+/*
+ * 变量说明：COM 层显式下层路由表。
+ * 修改说明：删除某个表项后，对应底层设备不会注册到 PduR，协议无法通过该设备收发。
+ */
+static vm_pdur_lower_route_t *const g_vm_comm_lower_route_table[] =
+{
+    &g_vm_comm_serial_route
+};
+
 static vm_status_t vm_comm_connect_serial(vm_comm_t *comm);
-static vm_status_t vm_comm_send_read(vm_comm_t *comm,
-                                     const vm_comm_variable_store_t *variable,
-                                     vm_comm_pending_kind_t kind,
-                                     const char *target_text);
-static vm_status_t vm_comm_send_write_bytes(vm_comm_t *comm,
-                                            const vm_comm_variable_store_t *var,
-                                            const uint8_t *data,
-                                            uint16_t size);
+static vm_status_t vm_comm_register_lower_routes(vm_comm_t *comm);
+static vm_status_t vm_comm_serial_route_read(void *lower_layer,
+                                             void *lower_device,
+                                             uint8_t *buffer,
+                                             size_t capacity,
+                                             size_t *read_size);
+static vm_status_t vm_comm_serial_route_write(void *lower_layer,
+                                              void *lower_device,
+                                              const uint8_t *data,
+                                              size_t size);
+static vm_status_t vm_comm_send_request(vm_comm_t *comm,
+                                        const vm_comm_variable_store_t *variable,
+                                        uint8_t command,
+                                        vm_comm_pending_kind_t kind,
+                                        const uint8_t *payload,
+                                        uint16_t length,
+                                        const char *target_text);
 static vm_status_t vm_comm_handle_read_response(vm_comm_t *comm,
-                                                const vm_custom_message_t *msg,
+                                                const vm_pdur_message_t *msg,
                                                 vm_comm_pending_t *pending);
 static vm_status_t vm_comm_handle_write_response(vm_comm_t *comm,
-                                                 const vm_custom_message_t *msg,
+                                                 const vm_pdur_message_t *msg,
                                                  vm_comm_pending_t *pending);
 static vm_status_t vm_comm_handle_error(vm_comm_t *comm,
-                                        const vm_custom_message_t *msg,
+                                        const vm_pdur_message_t *msg,
                                         vm_comm_pending_t *pending);
 static vm_status_t vm_comm_on_message(void *context,
-                                      const vm_custom_message_t *message);
+                                      const vm_pdur_message_t *message);
 
 /**
  * 函数说明：安全复制文本。
@@ -352,17 +377,19 @@ vm_status_t vm_comm_create(vm_comm_t **out)
     else
     {
         *out = NULL;
-        comm = (vm_comm_t *)calloc(1u, sizeof(*comm));
-        if (comm == NULL)
+        if (g_vm_comm_instance_used != 0u)
         {
-            status = VM_NOMEM;
+            status = VM_BUSY;
         }
         else
         {
+            comm = &g_vm_comm_instance;
+            (void)memset(comm, 0, sizeof(*comm));
             comm->config.type = VM_COMM_DEVICE_SERIAL;
             comm->config.serial_baudrate = VM_COMM_DEFAULT_BAUDRATE;
             comm->config.serial_data_bits = VM_COMM_DEFAULT_DATA_BITS;
             comm->config.serial_stop_bits = VM_COMM_DEFAULT_STOP_BITS;
+            g_vm_comm_instance_used = 1u;
             *out = comm;
             status = VM_OK;
         }
@@ -373,10 +400,11 @@ vm_status_t vm_comm_create(vm_comm_t **out)
 
 void vm_comm_destroy(vm_comm_t *comm)
 {
-    if (comm != NULL)
+    if (comm == &g_vm_comm_instance)
     {
         vm_comm_disconnect(comm);
-        free(comm);
+        (void)memset(comm, 0, sizeof(*comm));
+        g_vm_comm_instance_used = 0u;
     }
 }
 
@@ -463,6 +491,18 @@ void vm_comm_disconnect(vm_comm_t *comm)
         vm_service_manager_destroy(comm->services);
         comm->services = NULL;
 
+        if (comm->pdur != NULL)
+        {
+            vm_pdur_unregister_com_route(comm->pdur);
+        }
+
+        if ((comm->pdur != NULL) && (comm->serial_route != NULL))
+        {
+            (void)vm_pdur_unregister_lower_route(comm->pdur,
+                                                 comm->serial_route);
+            comm->serial_route = NULL;
+        }
+
         vm_pdur_destroy(comm->pdur);
         comm->pdur = NULL;
 
@@ -487,7 +527,8 @@ uint8_t vm_comm_is_connected(const vm_comm_t *comm)
 
     connected = 0u;
     if ((comm != NULL) && (comm->serial_if != NULL) &&
-        (comm->serial_device != NULL) && (comm->services != NULL))
+        (comm->serial_device != NULL) && (comm->serial_route != NULL) &&
+        (comm->services != NULL))
     {
         connected = vm_serial_if_is_open(comm->serial_if,
                                          comm->serial_device);
@@ -520,7 +561,13 @@ vm_status_t vm_comm_read_variable(vm_comm_t *comm,
     else
     {
         vm_comm_copy_variable(&stored, variable);
-        status = vm_comm_send_read(comm, &stored, VM_COMM_PENDING_READ, NULL);
+        status = vm_comm_send_request(comm,
+                                      &stored,
+                                      VM_PDUR_COMMAND_READ,
+                                      VM_COMM_PENDING_READ,
+                                      NULL,
+                                      stored.size,
+                                      NULL);
     }
 
     return status;
@@ -559,10 +606,13 @@ vm_status_t vm_comm_write_variable(vm_comm_t *comm,
         vm_comm_copy_variable(&stored, variable);
         if (stored.bit_field != 0u)
         {
-            status = vm_comm_send_read(comm,
-                                       &stored,
-                                       VM_COMM_PENDING_BITFIELD_READ,
-                                       target_text);
+            status = vm_comm_send_request(comm,
+                                           &stored,
+                                           VM_PDUR_COMMAND_READ,
+                                           VM_COMM_PENDING_BITFIELD_READ,
+                                           NULL,
+                                           stored.size,
+                                           target_text);
             if (status != VM_OK)
             {
                 vm_comm_set_error(error,
@@ -584,10 +634,13 @@ vm_status_t vm_comm_write_variable(vm_comm_t *comm,
                                      error_size);
             if (status == VM_OK)
             {
-                status = vm_comm_send_write_bytes(comm,
-                                                  &stored,
-                                                  data,
-                                                  (uint16_t)written);
+                status = vm_comm_send_request(comm,
+                                              &stored,
+                                              VM_PDUR_COMMAND_WRITE,
+                                              VM_COMM_PENDING_WRITE,
+                                              data,
+                                              (uint16_t)written,
+                                              NULL);
                 if (status != VM_OK)
                 {
                     vm_comm_set_error(error, error_size, "写入请求发送失败");
@@ -601,55 +654,103 @@ vm_status_t vm_comm_write_variable(vm_comm_t *comm,
 
 vm_status_t vm_comm_poll(vm_comm_t *comm, uint8_t budget)
 {
-    uint8_t index;
-    uint8_t rx_buffer[VM_COMM_RX_BUFFER_SIZE];
-    size_t read_size;
-    vm_pdur_context_t pdur_context;
     vm_status_t status;
 
-    if ((comm == NULL) || (comm->serial_if == NULL) ||
-        (comm->serial_device == NULL) || (comm->pdur == NULL))
+    if ((comm == NULL) || (comm->pdur == NULL) ||
+        (comm->serial_route == NULL) || (comm->services == NULL))
     {
         status = VM_BUSY;
     }
     else
     {
-        status = VM_OK;
-        for (index = 0u; index < budget; ++index)
-        {
-            read_size = 0u;
-            status = vm_serial_if_read(comm->serial_if,
-                                       comm->serial_device,
-                                       rx_buffer,
-                                       sizeof(rx_buffer),
-                                       &read_size);
-            if (status == VM_NOT_FOUND)
-            {
-                status = VM_OK;
-                break;
-            }
-            if (status != VM_OK)
-            {
-                break;
-            }
-            if (read_size == 0u)
-            {
-                break;
-            }
+        status = vm_pdur_poll(comm->pdur, budget);
+    }
 
-            pdur_context.device_type = VM_PDUR_DEVICE_SERIAL;
-            pdur_context.service_id = VM_PDUR_SERVICE_CUSTOM;
-            pdur_context.lower_layer = comm->serial_if;
-            pdur_context.lower_device = comm->serial_device;
-            pdur_context.rx_data = rx_buffer;
-            pdur_context.rx_size = read_size;
-            pdur_context.tx_data = NULL;
-            pdur_context.tx_size = 0u;
-            pdur_context.channel = 0u;
-            status = vm_pdur_input(comm->pdur, &pdur_context);
-            if (status != VM_OK)
+    return status;
+}
+
+/**
+ * 函数说明：PduR 串口下层路由读取适配函数。
+ * 输入：lower_layer，串口 IF 控制块；lower_device，串口设备；buffer，接收缓冲区；capacity，缓冲区容量。
+ * 输出：read_size 返回实际读取字节数。
+ * 返回：VM_OK 表示读到数据，VM_NOT_FOUND 表示暂无数据，其它状态码表示读取失败。
+ */
+static vm_status_t vm_comm_serial_route_read(void *lower_layer,
+                                             void *lower_device,
+                                             uint8_t *buffer,
+                                             size_t capacity,
+                                             size_t *read_size)
+{
+    return vm_serial_if_read((vm_serial_if_t *)lower_layer,
+                             (vm_mcal_serial_device_t *)lower_device,
+                             buffer,
+                             capacity,
+                             read_size);
+}
+
+/**
+ * 函数说明：PduR 串口下层路由发送适配函数。
+ * 输入：lower_layer，串口 IF 控制块；lower_device，串口设备；data，待发送数据；size，待发送长度。
+ * 输出：数据通过串口 IF 发送到设备。
+ * 返回：VM_OK 表示发送成功，其它状态码表示发送失败。
+ */
+static vm_status_t vm_comm_serial_route_write(void *lower_layer,
+                                              void *lower_device,
+                                              const uint8_t *data,
+                                              size_t size)
+{
+    return vm_serial_if_write((vm_serial_if_t *)lower_layer,
+                              (vm_mcal_serial_device_t *)lower_device,
+                              data,
+                              size);
+}
+
+/**
+ * 函数说明：按照显式下层路由表把底层设备节点挂接到 PduR。
+ * 输入：comm，COM 控制块。
+ * 输出：表中启用的下层路由节点被注册到 PduR；删除表项即可禁用对应底层设备。
+ * 返回：VM_OK 表示全部注册成功，其它状态码表示路由配置或注册失败。
+ */
+static vm_status_t vm_comm_register_lower_routes(vm_comm_t *comm)
+{
+    size_t index;
+    vm_pdur_lower_route_t *route;
+    vm_status_t status;
+
+    if ((comm == NULL) || (comm->pdur == NULL) ||
+        (comm->serial_if == NULL) || (comm->serial_device == NULL))
+    {
+        status = VM_INVALID;
+    }
+    else
+    {
+        (void)memset(&g_vm_comm_serial_route, 0, sizeof(g_vm_comm_serial_route));
+        g_vm_comm_serial_route.config.device_type = VM_PDUR_DEVICE_SERIAL;
+        g_vm_comm_serial_route.config.channel = VM_PDUR_CHANNEL_DEFAULT;
+        g_vm_comm_serial_route.config.lower_layer = comm->serial_if;
+        g_vm_comm_serial_route.config.lower_device = comm->serial_device;
+        g_vm_comm_serial_route.config.read = vm_comm_serial_route_read;
+        g_vm_comm_serial_route.config.write = vm_comm_serial_route_write;
+
+        status = VM_NOT_FOUND;
+        for (index = 0u;
+             (index < (sizeof(g_vm_comm_lower_route_table) /
+                       sizeof(g_vm_comm_lower_route_table[0]))) &&
+             ((status == VM_OK) || (status == VM_NOT_FOUND));
+             ++index)
+        {
+            route = g_vm_comm_lower_route_table[index];
+            if (route == NULL)
             {
-                break;
+                status = VM_INVALID;
+            }
+            else
+            {
+                status = vm_pdur_register_lower_route(comm->pdur, route);
+                if (status == VM_OK)
+                {
+                    comm->serial_route = route;
+                }
             }
         }
     }
@@ -660,7 +761,7 @@ vm_status_t vm_comm_poll(vm_comm_t *comm, uint8_t budget)
 /**
  * 函数说明：连接串口并搭建串口自定义协议栈。
  * 输入：comm，COM 控制块。
- * 输出：创建 IF 控制块、注册并打开串口设备、创建 PduR 和 Services。
+ * 输出：创建 IF 控制块、注册并打开串口设备、创建 PduR、注册下层路由并创建 Services。
  * 返回：VM_OK 表示完整链路搭建成功，其它状态码表示某一层初始化失败。
  */
 static vm_status_t vm_comm_connect_serial(vm_comm_t *comm)
@@ -702,13 +803,23 @@ static vm_status_t vm_comm_connect_serial(vm_comm_t *comm)
         }
         if (status == VM_OK)
         {
+            vm_pdur_com_config_t com_config;
+
+            (void)memset(&com_config, 0, sizeof(com_config));
+            com_config.indication = vm_comm_on_message;
+            com_config.context = comm;
+            status = vm_pdur_register_com_route(comm->pdur, &com_config);
+        }
+        if (status == VM_OK)
+        {
+            status = vm_comm_register_lower_routes(comm);
+        }
+        if (status == VM_OK)
+        {
             status = vm_service_manager_create(comm->pdur,
-                                              VM_PDUR_DEVICE_SERIAL,
-                                              comm->serial_if,
-                                              comm->serial_device,
-                                              vm_comm_on_message,
-                                              comm,
-                                              &comm->services);
+                                               VM_PDUR_DEVICE_SERIAL,
+                                               VM_PDUR_CHANNEL_DEFAULT,
+                                               &comm->services);
         }
         if (status == VM_OK)
         {
@@ -721,26 +832,35 @@ static vm_status_t vm_comm_connect_serial(vm_comm_t *comm)
 }
 
 /**
- * 函数说明：通过 Services 层发送变量读取请求。
- * 输入：comm，COM 控制块；variable，变量缓存；kind，pending 类型；target_text，位字段目标值。
- * 输出：pending 表记录请求，服务层发送读请求帧。
+ * 函数说明：通过 PduR 向协议服务发送变量读写请求。
+ * 输入：comm，COM 控制块；variable，变量缓存；command，读写命令；kind，pending 类型；
+ *       payload，写入负载；length，读写字节数；target_text，位字段目标值。
+ * 输出：pending 表记录请求，PduR 将请求路由到协议服务。
  * 返回：VM_OK 表示发送成功，其它状态码表示未连接、参数错误或发送失败。
  */
-static vm_status_t vm_comm_send_read(vm_comm_t *comm,
-                                     const vm_comm_variable_store_t *variable,
-                                     vm_comm_pending_kind_t kind,
-                                     const char *target_text)
+static vm_status_t vm_comm_send_request(vm_comm_t *comm,
+                                        const vm_comm_variable_store_t *variable,
+                                        uint8_t command,
+                                        vm_comm_pending_kind_t kind,
+                                        const uint8_t *payload,
+                                        uint16_t length,
+                                        const char *target_text)
 {
+    vm_pdur_message_t message;
     uint8_t sequence;
     vm_comm_pending_t *pending;
     vm_status_t status;
 
     if ((comm == NULL) || (comm->services == NULL) ||
-        (variable == NULL))
+        (variable == NULL) ||
+        ((command == VM_PDUR_COMMAND_WRITE) && (payload == NULL) &&
+         (length > 0u)))
     {
         status = VM_BUSY;
     }
-    else if (variable->size > VM_COMM_PAYLOAD_MAX)
+    else if ((length > VM_COMM_PAYLOAD_MAX) ||
+             ((command != VM_PDUR_COMMAND_READ) &&
+              (command != VM_PDUR_COMMAND_WRITE)))
     {
         status = VM_INVALID;
     }
@@ -758,63 +878,16 @@ static vm_status_t vm_comm_send_read(vm_comm_t *comm,
         }
         else
         {
-            status = vm_service_custom_read(comm->services,
-                                                sequence,
-                                                variable->address,
-                                                variable->size);
-            if (status != VM_OK)
-            {
-                vm_comm_free_pending(pending);
-            }
-        }
-    }
-
-    return status;
-}
-
-/**
- * 函数说明：通过 Services 层发送变量写入请求。
- * 输入：comm，COM 控制块；var，变量缓存；data，已编码字节；size，字节数。
- * 输出：pending 表记录请求，服务层发送写请求帧。
- * 返回：VM_OK 表示发送成功，其它状态码表示未连接、参数错误或发送失败。
- */
-static vm_status_t vm_comm_send_write_bytes(vm_comm_t *comm,
-                                            const vm_comm_variable_store_t *var,
-                                            const uint8_t *data,
-                                            uint16_t size)
-{
-    uint8_t sequence;
-    vm_comm_pending_t *pending;
-    vm_status_t status;
-
-    if ((comm == NULL) || (comm->services == NULL) || (var == NULL) ||
-        ((data == NULL) && (size > 0u)))
-    {
-        status = VM_BUSY;
-    }
-    else if (size > VM_COMM_PAYLOAD_MAX)
-    {
-        status = VM_INVALID;
-    }
-    else
-    {
-        sequence = vm_comm_next_sequence(comm);
-        pending = vm_comm_alloc_pending(comm,
-                                        sequence,
-                                        VM_COMM_PENDING_WRITE,
-                                        var,
-                                        NULL);
-        if (pending == NULL)
-        {
-            status = VM_BUSY;
-        }
-        else
-        {
-            status = vm_service_custom_write(comm->services,
-                                                 sequence,
-                                                 var->address,
-                                                 data,
-                                                 size);
+            (void)memset(&message, 0, sizeof(message));
+            message.device_type = VM_PDUR_DEVICE_SERIAL;
+            message.service_id = VM_PDUR_SERVICE_CUSTOM;
+            message.channel = VM_PDUR_CHANNEL_DEFAULT;
+            message.command = command;
+            message.sequence = sequence;
+            message.address = variable->address;
+            message.payload = payload;
+            message.length = length;
+            status = vm_pdur_service_request(comm->pdur, &message);
             if (status != VM_OK)
             {
                 vm_comm_free_pending(pending);
@@ -832,7 +905,7 @@ static vm_status_t vm_comm_send_write_bytes(vm_comm_t *comm,
  * 返回：VM_OK 表示处理完成。
  */
 static vm_status_t vm_comm_handle_read_response(vm_comm_t *comm,
-                                                const vm_custom_message_t *msg,
+                                                const vm_pdur_message_t *msg,
                                                 vm_comm_pending_t *pending)
 {
     vm_value_meta_t meta;
@@ -868,10 +941,13 @@ static vm_status_t vm_comm_handle_read_response(vm_comm_t *comm,
 
             variable = pending->variable;
             vm_comm_free_pending(pending);
-            status = vm_comm_send_write_bytes(comm,
-                                              &variable,
-                                              encoded,
-                                              (uint16_t)written);
+            status = vm_comm_send_request(comm,
+                                          &variable,
+                                          VM_PDUR_COMMAND_WRITE,
+                                          VM_COMM_PENDING_WRITE,
+                                          encoded,
+                                          (uint16_t)written,
+                                          NULL);
         }
         else
         {
@@ -926,7 +1002,7 @@ static vm_status_t vm_comm_handle_read_response(vm_comm_t *comm,
  * 返回：VM_OK 表示处理完成。
  */
 static vm_status_t vm_comm_handle_write_response(vm_comm_t *comm,
-                                                 const vm_custom_message_t *msg,
+                                                 const vm_pdur_message_t *msg,
                                                  vm_comm_pending_t *pending)
 {
     vm_comm_event_t event;
@@ -969,7 +1045,7 @@ static vm_status_t vm_comm_handle_write_response(vm_comm_t *comm,
  * 返回：VM_OK 表示处理完成。
  */
 static vm_status_t vm_comm_handle_error(vm_comm_t *comm,
-                                        const vm_custom_message_t *msg,
+                                        const vm_pdur_message_t *msg,
                                         vm_comm_pending_t *pending)
 {
     vm_comm_event_t event;
@@ -1011,13 +1087,13 @@ static vm_status_t vm_comm_handle_error(vm_comm_t *comm,
 }
 
 /**
- * 函数说明：custom service 完整协议消息回调。
- * 输入：context，COM 控制块；message，自定义协议消息。
+ * 函数说明：PduR 转发的协议逻辑消息回调。
+ * 输入：context，COM 控制块；message，PduR 上报的协议逻辑消息。
  * 输出：根据 command 分派到读响应、写响应或错误响应处理函数。
  * 返回：VM_OK 表示消息处理完成。
  */
 static vm_status_t vm_comm_on_message(void *context,
-                                      const vm_custom_message_t *message)
+                                      const vm_pdur_message_t *message)
 {
     vm_comm_t *comm;
     vm_comm_pending_t *pending;
@@ -1039,15 +1115,15 @@ static vm_status_t vm_comm_on_message(void *context,
 
         switch (message->command)
         {
-            case VM_CUSTOM_READ_RESPONSE:
+            case VM_PDUR_COMMAND_READ_RESPONSE:
                 status = vm_comm_handle_read_response(comm, message, pending);
                 break;
 
-            case VM_CUSTOM_WRITE_RESPONSE:
+            case VM_PDUR_COMMAND_WRITE_RESPONSE:
                 status = vm_comm_handle_write_response(comm, message, pending);
                 break;
 
-            case VM_CUSTOM_ERROR:
+            case VM_PDUR_COMMAND_ERROR:
                 status = vm_comm_handle_error(comm, message, pending);
                 break;
 

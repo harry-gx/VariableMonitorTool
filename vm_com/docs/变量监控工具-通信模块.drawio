@@ -1,0 +1,153 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="第 1 页" id="elqsqlWWfksjzCcJNav_">
+    <mxGraphModel dx="2054" dy="1103" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-26" parent="1" style="rounded=0;whiteSpace=wrap;html=1;dashed=1;align=center;verticalAlign=top;fontSize=20;labelBackgroundColor=none;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="&lt;div&gt;通信模块&lt;/div&gt;" vertex="1">
+          <mxGeometry height="563" width="928" x="204" y="295" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-33" edge="1" parent="1" source="e45ouxoSCLLPOTzPY_Mf-32" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=-0.018;entryY=0.735;entryDx=0;entryDy=0;entryPerimeter=0;" target="e45ouxoSCLLPOTzPY_Mf-23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-34" connectable="0" parent="e45ouxoSCLLPOTzPY_Mf-33" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="open，close等控制驱动打开关闭的接口" vertex="1">
+          <mxGeometry relative="1" x="-0.0071" y="-1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-32" parent="1" style="rounded=0;whiteSpace=wrap;html=1;dashed=1;align=center;verticalAlign=top;fontSize=20;" value="" vertex="1">
+          <mxGeometry height="93" width="558" x="224" y="658" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-10" edge="1" parent="1" source="e45ouxoSCLLPOTzPY_Mf-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="e45ouxoSCLLPOTzPY_Mf-2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="499" y="558.13" />
+              <mxPoint x="702" y="558.13" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-37" connectable="0" parent="e45ouxoSCLLPOTzPY_Mf-10" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="read，write等发送接收数据的接口" vertex="1">
+          <mxGeometry relative="1" x="0.2035" as="geometry">
+            <mxPoint x="-22" y="1" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-11" edge="1" parent="1" source="e45ouxoSCLLPOTzPY_Mf-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="e45ouxoSCLLPOTzPY_Mf-3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="498.55" y="546.52" />
+              <mxPoint x="498.55" y="546.52" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-36" connectable="0" parent="e45ouxoSCLLPOTzPY_Mf-11" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="read，write等发送接收数据的接口" vertex="1">
+          <mxGeometry relative="1" x="-0.048" y="-3" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-12" edge="1" parent="1" source="e45ouxoSCLLPOTzPY_Mf-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="e45ouxoSCLLPOTzPY_Mf-6">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="499" y="558" />
+              <mxPoint x="296" y="558" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-35" connectable="0" parent="e45ouxoSCLLPOTzPY_Mf-12" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="read，write等发送接收数据的接口" vertex="1">
+          <mxGeometry relative="1" x="0.5213" y="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-20" edge="1" parent="1" source="e45ouxoSCLLPOTzPY_Mf-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="e45ouxoSCLLPOTzPY_Mf-17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-21" edge="1" parent="1" source="e45ouxoSCLLPOTzPY_Mf-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="e45ouxoSCLLPOTzPY_Mf-18">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-22" edge="1" parent="1" source="e45ouxoSCLLPOTzPY_Mf-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="e45ouxoSCLLPOTzPY_Mf-19">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-38" connectable="0" parent="e45ouxoSCLLPOTzPY_Mf-22" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="协议拆包、组包" vertex="1">
+          <mxGeometry relative="1" x="-0.851" y="2" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="PDUR" vertex="1">
+          <mxGeometry height="60" width="120" x="439" y="474" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-13" edge="1" parent="1" source="e45ouxoSCLLPOTzPY_Mf-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="e45ouxoSCLLPOTzPY_Mf-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="CAN_TP" vertex="1">
+          <mxGeometry height="60" width="120" x="642" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-15" edge="1" parent="1" source="e45ouxoSCLLPOTzPY_Mf-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="e45ouxoSCLLPOTzPY_Mf-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="SERIAL_IF" vertex="1">
+          <mxGeometry height="60" width="120" x="439" y="673" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-14" edge="1" parent="1" source="e45ouxoSCLLPOTzPY_Mf-5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="e45ouxoSCLLPOTzPY_Mf-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="CAN_IF" vertex="1">
+          <mxGeometry height="60" width="120" x="642" y="675" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-16" edge="1" parent="1" source="e45ouxoSCLLPOTzPY_Mf-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="e45ouxoSCLLPOTzPY_Mf-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="ETH_IF" vertex="1">
+          <mxGeometry height="60" width="120" x="236" y="675" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="SERIAL_MCAL" vertex="1">
+          <mxGeometry height="60" width="120" x="439" y="768" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="ETH_MCAL" vertex="1">
+          <mxGeometry height="60" width="120" x="236" y="770" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="CAN_MCAL" vertex="1">
+          <mxGeometry height="60" width="120" x="642" y="770" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-17" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="CUSTOM" vertex="1">
+          <mxGeometry height="60" width="120" x="236" y="353" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-18" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="UDS" vertex="1">
+          <mxGeometry height="60" width="120" x="439" y="353" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-19" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="XCP" vertex="1">
+          <mxGeometry height="60" width="120" x="642" y="353" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-31" edge="1" parent="1" source="e45ouxoSCLLPOTzPY_Mf-23" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="e45ouxoSCLLPOTzPY_Mf-28">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1213.41" y="591.53" />
+              <mxPoint x="1213.41" y="940.47" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-23" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="COM" vertex="1">
+          <mxGeometry height="477" width="94" x="1003" y="353" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-25" edge="1" parent="1" source="e45ouxoSCLLPOTzPY_Mf-1" style="endArrow=classic;startArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.006;entryY=0.32;entryDx=0;entryDy=0;entryPerimeter=0;" target="e45ouxoSCLLPOTzPY_Mf-23" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="488" y="612" as="sourcePoint" />
+            <mxPoint x="538" y="562" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-39" connectable="0" parent="e45ouxoSCLLPOTzPY_Mf-25" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="上行：经过协议拆包统一把数据给COM，再由COM给UI界面&lt;div&gt;下行：COM下发的数据路由到对应协议，协议组包后再路由到底层驱动设备发送&lt;/div&gt;" vertex="1">
+          <mxGeometry relative="1" x="-0.0672" y="-1" as="geometry">
+            <mxPoint x="15" y="-2" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-30" edge="1" parent="1" source="e45ouxoSCLLPOTzPY_Mf-27" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="e45ouxoSCLLPOTzPY_Mf-28">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-27" parent="1" style="rounded=0;whiteSpace=wrap;html=1;dashed=1;align=center;verticalAlign=top;fontSize=20;" value="ELF/AXF解析模块" vertex="1">
+          <mxGeometry height="563" width="928" x="204" y="917" as="geometry" />
+        </mxCell>
+        <mxCell id="e45ouxoSCLLPOTzPY_Mf-28" parent="1" style="rounded=0;whiteSpace=wrap;html=1;dashed=1;align=center;verticalAlign=top;fontSize=20;" value="UI界面模块" vertex="1">
+          <mxGeometry height="563" width="928" x="1296" y="659" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

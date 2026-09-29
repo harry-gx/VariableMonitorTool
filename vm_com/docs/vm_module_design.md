@@ -6,18 +6,18 @@
 
 ### `vm_comm_create(vm_comm_t **out)`
 
-创建 COM 层通信对象。
+获取并初始化 COM 层静态通信对象。通信模块当前只提供一个 COM 实例，函数保持 create 命名是为了兼容 UI 侧已有调用。
 
 - 输入：`out`，通信对象指针输出地址。
-- 输出：成功时 `*out` 指向新对象，默认设备类型为串口，默认串口参数为 115200/8N1。
-- 返回：`VM_OK`、`VM_INVALID`、`VM_NOMEM`。
+- 输出：成功时 `*out` 指向静态通信对象，默认设备类型为串口，默认串口参数为 115200/8N1。
+- 返回：`VM_OK`、`VM_INVALID`、`VM_BUSY`。
 
 ### `vm_comm_destroy(vm_comm_t *comm)`
 
-销毁通信对象。函数会先断开设备，释放 Services、PduR、Serial IF、MCAL 串口设备和 pending 请求。
+反初始化 COM 层静态通信对象。函数会先断开设备，注销 Services、PduR COM 入口和下层路由，清理 PduR、Serial IF、MCAL 串口设备和 pending 请求。
 
 - 输入：`comm`，通信对象。
-- 输出：释放所有由通信对象持有的资源。
+- 输出：所有静态节点从链表摘除并清零，不做堆内存释放。
 - 返回：无。
 
 ### `vm_comm_set_device_config(vm_comm_t *comm, const vm_comm_device_config_t *config)`
@@ -33,15 +33,15 @@
 按照已设置配置搭建通信链路。
 
 - 输入：通信对象。
-- 输出：串口路径依次创建 `Serial IF -> 注册当前平台 MCAL 设备模板 -> IF 层创建串口设备 -> PduR -> Services -> Custom Service`，并打开串口。
+- 输出：串口路径依次初始化 `Serial IF 静态控制块 -> 当前平台 MCAL 设备模板 -> IF 层静态串口设备 -> PduR 静态控制块 -> 注册 COM 上报入口 -> 按显式下层路由表注册串口路由 -> 按 Services 显式服务表注册 Custom Service`，并打开串口。
 - 返回：串口成功返回 `VM_OK`；CAN、CANFD、以太网当前返回 `VM_UNSUPPORTED`。
 
 ### `vm_comm_disconnect(vm_comm_t *comm)`
 
-断开设备并释放内部通信栈对象。
+断开设备并反初始化内部通信栈对象。
 
 - 输入：通信对象。
-- 输出：销毁 Services、销毁 PduR、注销并关闭串口设备、释放 MCAL 和 IF，清空 pending。
+- 输出：注销 Services、注销 PduR COM 上报入口、注销 PduR 下层路由、清理 PduR、注销并关闭串口设备、清理 IF，清空 pending；所有节点均为静态节点，只摘链和清状态。
 - 返回：无。
 
 ### `vm_comm_is_connected(const vm_comm_t *comm)`
@@ -50,7 +50,7 @@
 
 - 输入：通信对象。
 - 输出：无。
-- 返回：`1` 表示串口 IF 中的当前设备已打开且 Services 已创建；`0` 表示未连接。
+- 返回：`1` 表示串口 IF 中的当前设备已打开、PduR 下层路由已注册且 Services 已创建；`0` 表示未连接。
 
 ### `vm_comm_set_event_callback(vm_comm_t *comm, vm_comm_event_fn callback, void *context)`
 
@@ -73,7 +73,7 @@
 发送变量读取请求。
 
 - 输入：通信对象和变量描述，变量描述包含名称、类型名、目标地址、字节数、位字段信息。
-- 输出：请求被登记到 pending 表并通过 Services 发送；响应异步通过事件回调返回。
+- 输出：请求被登记到 pending 表并通过 PduR 路由到协议服务；响应异步通过事件回调返回。
 - 返回：`VM_OK`、`VM_INVALID`、`VM_BUSY`。
 
 ### `vm_comm_write_variable(...)`
@@ -89,14 +89,14 @@
 处理接收链路。
 
 - 输入：通信对象；`budget` 表示本次最多读取并处理多少轮串口缓存。
-- 输出：收到数据后触发 `Serial IF -> PduR -> Services -> Custom Service -> COM`，可能产生 UI 事件回调。
+- 输出：COM 触发 `PduR -> 下层路由 read -> Serial IF -> PduR -> Custom Service -> PduR -> COM`，可能产生 UI 事件回调。
 - 返回：`VM_OK`、`VM_BUSY` 或底层错误。
 
 ## 内部公共基础设施
 
 ### 侵入式链表：`src/common/include/vm_list.h`
 
-通信模块内所有节点挂接统一使用该链表，包括 IF 层平台设备模板节点、IF 层运行时设备节点和 PduR 服务节点。该文件从 `vm_elf_parser/private/vm_list.h` 拷贝到通信模块内部，链表节点由业务结构体内嵌，链表本身不拥有业务对象，避免每个层级重复实现 `next` 指针链。
+通信模块内所有节点挂接统一使用该链表，包括 IF 层运行时设备节点、PduR 下层路由节点和 PduR 服务节点。该文件从 `vm_elf_parser/private/vm_list.h` 拷贝到通信模块内部，链表节点由业务结构体内嵌，链表本身不拥有业务对象，避免每个层级重复实现 `next` 指针链。
 
 - 主要内部接口：`INIT_LIST_HEAD()`、`LIST_ADD_TAIL()`、`LIST_DEL()`、`list_entry()`、`LIST_FOR_EACH_ENTRY()`、`LIST_FOR_EACH_ENTRY_SAFE()`。
 - 输入：链表头、内嵌节点或遍历游标。
@@ -107,7 +107,7 @@
 
 ### COM 层：`src/com/vm_communication.c`
 
-负责 UI 业务请求汇总、连接生命周期、pending 表、值编解码调度、位字段读改写和事件上报。COM 层调用 Services 总入口、PduR 和 Serial IF 的内部接口，不调用平台串口 API，也不直接创建 custom 协议服务。
+负责 UI 业务请求汇总、连接生命周期、pending 表、值编解码调度、位字段读改写和事件上报。COM 层负责打开/关闭串口 IF，把串口 IF 作为下层路由注册到 PduR，并把自己的事件接收函数注册为 PduR 的 COM 上报入口；业务读写请求只调用 PduR 通用消息接口，不直接调用任何协议服务。COM 层内部用 `g_vm_comm_lower_route_table[]` 显式列出启用的下层路由，删除某个表项即可禁用对应底层设备通道。
 
 ### 值编解码：`src/com/vm_value_codec.c`
 
@@ -126,7 +126,7 @@
 
 ### IF 层：`src/if/vm_serial_if.c`
 
-负责平台设备模板挂接、平台选择、串口配置校验、设备生命周期和统一读写封装。
+负责平台设备模板挂接、平台选择、串口配置校验、设备生命周期和统一读写封装。Serial IF 使用静态控制块、静态运行时设备节点和静态平台上下文存储，不在连接过程中申请堆内存。
 
 - 主要内部接口：`vm_serial_if_create()`、`vm_serial_if_register_device()`、`vm_serial_if_unregister_device()`、`vm_serial_if_open()`、`vm_serial_if_close()`、`vm_serial_if_read()`、`vm_serial_if_write()`。平台模板挂接和运行时设备创建已收敛到 IF 内部，不再向上暴露独立接口。
 - 输入：串口配置、运行时串口设备、读写缓冲区。IF 层只维护一个运行时设备链表，当前平台模板通过指针保存，不单独挂链表。
@@ -135,29 +135,29 @@
 
 ### PduR 层：`src/pdur/vm_pdur.c`
 
-负责路由下层 PDU 和服务输出。
+负责路由下层 PDU、COM 逻辑请求、协议服务输出和协议服务上报。PduR 使用静态控制块，下层路由节点和协议服务节点由对应模块静态定义，PduR 注册时只把节点挂接到侵入式链表。
 
-- 主要内部接口：`vm_pdur_register_service()`、`vm_pdur_input()`、`vm_pdur_output()`。
-- 输入：`vm_pdur_context_t`，包含设备类型、服务 ID、下层句柄和收发数据。服务节点通过 `vm_list` 挂接。
-- 输出：匹配服务被调用，或数据写回下层 IF/TP。
-- 说明：串口当前直接路由到 Serial IF；CAN/CANFD 后续在 TP 层接入后再路由。
+- 主要内部接口：`vm_pdur_register_lower_route()`、`vm_pdur_unregister_lower_route()`、`vm_pdur_register_com_route()`、`vm_pdur_unregister_com_route()`、`vm_pdur_register_service()`、`vm_pdur_unregister_service()`、`vm_pdur_poll()`、`vm_pdur_input()`、`vm_pdur_output()`、`vm_pdur_service_request()`、`vm_pdur_com_indicate()`。
+- 输入：下层路由静态节点包含设备类型、通道号、下层对象和 read/write 回调；COM 注册配置包含上报回调；服务静态节点包含设备类型、通道号、服务 ID、匹配函数、下层处理函数和 COM 请求处理函数；`vm_pdur_context_t` 包含设备类型、服务 ID、通道号和收发数据；`vm_pdur_message_t` 表达 COM 与协议服务之间的通用读写语义。
+- 输出：接收方向由 PduR 轮询下层路由并调用匹配服务；COM 下行方向由 PduR 按设备类型、通道号和服务 ID 找到协议服务；服务发送方向由 PduR 按设备类型和通道号查找下层路由并调用 write 回调；服务上行方向由 PduR 调用已注册的 COM 上报入口。
+- 说明：`vm_pdur.c` 中用 `g_vm_pdur_device_info[]` 显式列出设备类型输出路由。串口当前注册 Serial IF 下层路由；CAN/CANFD 后续注册 CAN TP 下层路由；以太网后续注册 Ethernet IF 下层路由。删除设备路由表项或不注册下层静态节点时，对应设备不可用。
 
 ### Services 层：`src/services/vm_service.c`
 
-负责协议服务抽象和挂接。
+负责协议服务节点的初始化和挂接，职责等同于 `tkd_shal` 中集中调用 `PduR_ServiceRegister()` 的 service 初始化文件。
 
-- 主要内部接口：`vm_service_manager_create()`、`vm_service_manager_destroy()`、`vm_service_custom_read()`、`vm_service_custom_write()`。
-- 输入：PduR 控制块、下层 IF/设备、协议请求参数。
-- 输出：已编码请求通过 PduR 发送；收到完整协议消息后回调 COM。
-- 说明：后续 XCP、UDS 在 Services 层新增子服务，COM 层不直接调用具体协议服务。
+- 主要内部接口：`vm_service_manager_create()`、`vm_service_manager_destroy()`。
+- 输入：PduR 控制块、设备类型和通道号。
+- 输出：当前阶段把 custom 静态服务节点注册到 PduR；反初始化时从 PduR 注销节点。
+- 说明：该层不转发 COM 业务请求，也不向 COM 回调数据。`vm_service.c` 中用 `g_vm_service_table[]` 显式列出启用的协议服务，删除某个表项后，对应协议不会注册到 PduR，整条协议链路不可用。后续 XCP、UDS 在 Services 下新增子目录和服务节点，并在该表中统一注册到 PduR。
 
 ### 自定义协议服务：`src/services/custom/vm_custom_service.c`
 
-负责把自定义变量监控协议挂到 Services/PduR。
+负责把自定义变量监控协议挂到 Services/PduR。custom 服务对象、PduR 服务节点和流式解析器均为静态对象。
 
-- 主要内部接口：`vm_custom_service_create()`、`vm_custom_service_send_read()`、`vm_custom_service_send_write()`。
-- 输入：PduR 控制块、下层 IF/设备、请求序号、地址、长度或负载。
-- 输出：协议帧经 PduR 发出；接收方向解析出完整消息后回调 Services/COM。
+- 主要内部接口：`vm_custom_service_create()`、`vm_custom_service_destroy()`。PduR 的服务请求回调内直接完成读写命令判断、协议组包和 PduR 输出，不再额外拆出 read/write/send_frame 转发函数。
+- 输入：PduR 控制块、设备类型、通道号，以及 PduR 转入的 `vm_pdur_message_t` 或下层原始字节流。
+- 输出：COM 请求被编码为自定义协议帧并经 PduR 发出；接收方向解析出完整消息后转换成 `vm_pdur_message_t` 并通过 PduR 上报 COM。
 
 ### 自定义协议帧：`src/services/custom/vm_custom_protocol.c`
 

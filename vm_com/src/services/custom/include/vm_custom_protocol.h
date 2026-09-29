@@ -12,6 +12,8 @@ VM_BEGIN
 #define VM_CUSTOM_SOF0 0xAAu
 /* 常量说明：VM_CUSTOM_SOF1 用于配置协议长度、默认参数、缓冲区容量或编译开关。 */
 #define VM_CUSTOM_SOF1 0x55u
+/* 常量说明：自定义协议流式解析缓冲区容量，覆盖当前最大单帧长度并保留粘包空间。 */
+#define VM_CUSTOM_PARSER_BUFFER_SIZE (2048u)
 enum
 {
     VM_CUSTOM_READ = 1,
@@ -36,8 +38,14 @@ typedef struct
     /* 变量说明：length，保存当前对象运行所需的状态、参数或缓存数据。 */
     uint16_t length;
 } vm_custom_message_t;
-/* 类型说明：结构体保存模块状态、配置、变量描述或解析结果。 */
-typedef struct vm_custom_parser vm_custom_parser_t;
+/* 类型说明：自定义协议流式解析器，使用静态缓冲区保存半包和粘包数据。 */
+typedef struct vm_custom_parser
+{
+    /* 变量说明：流式接收缓冲区。 */
+    uint8_t buffer[VM_CUSTOM_PARSER_BUFFER_SIZE];
+    /* 变量说明：当前缓冲区中有效字节数。 */
+    size_t size;
+} vm_custom_parser_t;
 /**
  * 函数说明：vm_custom_make_read，读取数据或发起读取请求。
  * 输入：sequence：函数输入参数，参与本函数的计算、查找或状态更新。；address：函数输入参数，参与本函数的计算、查找或状态更新。；length：函数输入参数，参与本函数的计算、查找或状态更新。；out：输出对象或结果指针，函数成功时写入有效值。；capacity：函数输入参数，参与本函数的计算、查找或状态更新。；written：函数输入参数，参与本函数的计算、查找或状态更新。
@@ -82,6 +90,22 @@ vm_status_t vm_custom_encode(const vm_custom_message_t *message,
 vm_status_t vm_custom_decode(const uint8_t *data,
                              size_t size,
                              vm_custom_message_t *message);
+/**
+ * 函数说明：初始化静态协议解析器。
+ * 输入：parser，调用方提供的解析器对象。
+ * 输出：解析器缓冲区和状态被清零。
+ * 返回：VM_OK 表示成功，VM_INVALID 表示参数错误。
+ */
+vm_status_t vm_custom_parser_init(vm_custom_parser_t *parser);
+
+/**
+ * 函数说明：复位静态协议解析器。
+ * 输入：parser，调用方提供的解析器对象。
+ * 输出：解析器状态清零，已缓存半包被丢弃。
+ * 返回：无。
+ */
+void vm_custom_parser_reset(vm_custom_parser_t *parser);
+
 /**
  * 函数说明：vm_custom_parser_create，创建并初始化对象。
  * 输入：out：输出对象或结果指针，函数成功时写入有效值。

@@ -6,19 +6,12 @@
 
 #include "vm_custom_protocol.h"
 
-#include <stdlib.h>
 #include <string.h>
 
-/* 类型说明：结构体保存模块状态、配置、变量描述或解析结果。 */
-struct vm_custom_parser
-{
-    /* 变量说明：buffer，保存当前对象运行所需的状态、参数或缓存数据。 */
-    uint8_t *buffer;
-    /* 变量说明：size，数据长度，单位为字节。 */
-    size_t size;
-    /* 变量说明：capacity，动态数组容量。 */
-    size_t capacity;
-};
+/* 变量说明：兼容旧 create/destroy 接口的静态解析器实例，测试代码可继续使用指针形式。 */
+static vm_custom_parser_t g_vm_custom_parser_instance;
+/* 变量说明：静态解析器占用标志，防止旧接口重复获取同一个解析器。 */
+static uint8_t g_vm_custom_parser_allocated;
 
 /**
  * 函数说明：put16，执行本模块对应功能逻辑。
@@ -243,6 +236,31 @@ vm_custom_decode(const uint8_t *data, size_t size, vm_custom_message_t *message)
     return VM_OK;
 }
 
+vm_status_t vm_custom_parser_init(vm_custom_parser_t *parser)
+{
+    vm_status_t status;
+
+    if (parser == NULL)
+    {
+        status = VM_INVALID;
+    }
+    else
+    {
+        (void)memset(parser, 0, sizeof(*parser));
+        status = VM_OK;
+    }
+
+    return status;
+}
+
+void vm_custom_parser_reset(vm_custom_parser_t *parser)
+{
+    if (parser != NULL)
+    {
+        (void)vm_custom_parser_init(parser);
+    }
+}
+
 /**
  * 函数说明：vm_custom_parser_create，创建并初始化对象。
  * 输入：out：输出对象或结果指针，函数成功时写入有效值。
@@ -251,30 +269,32 @@ vm_custom_decode(const uint8_t *data, size_t size, vm_custom_message_t *message)
  */
 vm_status_t vm_custom_parser_create(vm_custom_parser_t **out)
 {
-    vm_custom_parser_t *parser;
+    vm_status_t status;
 
-    if (!out)
+    if (out == NULL)
     {
-        return VM_INVALID;
+        status = VM_INVALID;
+    }
+    else if (g_vm_custom_parser_allocated != 0u)
+    {
+        *out = NULL;
+        status = VM_BUSY;
+    }
+    else
+    {
+        status = vm_custom_parser_init(&g_vm_custom_parser_instance);
+        if (status == VM_OK)
+        {
+            g_vm_custom_parser_allocated = 1u;
+            *out = &g_vm_custom_parser_instance;
+        }
+        else
+        {
+            *out = NULL;
+        }
     }
 
-    *out = NULL;
-    parser = (vm_custom_parser_t *)calloc(1, sizeof(*parser));
-    if (!parser)
-    {
-        return VM_NOMEM;
-    }
-
-    parser->capacity = 2048u;
-    parser->buffer = (uint8_t *)malloc(parser->capacity);
-    if (!parser->buffer)
-    {
-        free(parser);
-        return VM_NOMEM;
-    }
-
-    *out = parser;
-    return VM_OK;
+    return status;
 }
 
 /**
@@ -285,10 +305,10 @@ vm_status_t vm_custom_parser_create(vm_custom_parser_t **out)
  */
 void vm_custom_parser_destroy(vm_custom_parser_t *parser)
 {
-    if (parser)
+    if (parser == &g_vm_custom_parser_instance)
     {
-        free(parser->buffer);
-        free(parser);
+        vm_custom_parser_reset(parser);
+        g_vm_custom_parser_allocated = 0u;
     }
 }
 
@@ -308,12 +328,13 @@ vm_status_t vm_custom_parser_feed(
     vm_custom_message_t message;
     vm_status_t status;
 
-    if (!parser || (!data && size) || !callback)
+    if ((parser == NULL) || ((data == NULL) && (size > 0u)) ||
+        (callback == NULL))
     {
         return VM_INVALID;
     }
 
-    if (size > parser->capacity - parser->size)
+    if (size > ((size_t)VM_CUSTOM_PARSER_BUFFER_SIZE - parser->size))
     {
         return VM_NOMEM;
     }
@@ -347,7 +368,7 @@ vm_status_t vm_custom_parser_feed(
             }
 
             total = wire_payload_size(command, length) + 13u;
-            if (total > parser->capacity)
+            if (total > (size_t)VM_CUSTOM_PARSER_BUFFER_SIZE)
             {
                 return VM_FORMAT;
             }
