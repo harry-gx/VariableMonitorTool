@@ -470,10 +470,8 @@ void vm_comm_disconnect(vm_comm_t *comm)
         {
             (void)vm_serial_if_unregister_device(comm->serial_if,
                                                  comm->serial_device);
+            comm->serial_device = NULL;
         }
-
-        vm_mcal_serial_destroy(comm->serial_device);
-        comm->serial_device = NULL;
 
         vm_serial_if_destroy(comm->serial_if);
         comm->serial_if = NULL;
@@ -662,13 +660,12 @@ vm_status_t vm_comm_poll(vm_comm_t *comm, uint8_t budget)
 /**
  * 函数说明：连接串口并搭建串口自定义协议栈。
  * 输入：comm，COM 控制块。
- * 输出：注册串口驱动节点、创建 MCAL 设备、打开设备、创建 PduR 和 Services。
+ * 输出：创建 IF 控制块、注册并打开串口设备、创建 PduR 和 Services。
  * 返回：VM_OK 表示完整链路搭建成功，其它状态码表示某一层初始化失败。
  */
 static vm_status_t vm_comm_connect_serial(vm_comm_t *comm)
 {
     vm_mcal_serial_config_t serial_config;
-    vm_mcal_serial_device_t *opened_device;
     vm_status_t status;
 
     if (comm == NULL)
@@ -677,39 +674,30 @@ static vm_status_t vm_comm_connect_serial(vm_comm_t *comm)
     }
     else
     {
-        serial_config.device_name = comm->config.serial_device;
+        (void)memset(&serial_config, 0, sizeof(serial_config));
+        vm_comm_copy_text(serial_config.device_name,
+                          sizeof(serial_config.device_name),
+                          comm->config.serial_device);
         serial_config.baudrate = comm->config.serial_baudrate;
         serial_config.data_bits = comm->config.serial_data_bits;
         serial_config.stop_bits = comm->config.serial_stop_bits;
         serial_config.parity = comm->config.serial_parity;
         serial_config.flow_control = comm->config.serial_flow_control;
 
-        opened_device = NULL;
         status = vm_serial_if_create(&comm->serial_if);
         if (status == VM_OK)
         {
-            status = vm_serial_if_register_default_drivers(comm->serial_if);
-        }
-        if (status == VM_OK)
-        {
-            status = vm_serial_if_create_device(comm->serial_if,
-                                                &serial_config,
-                                                &comm->serial_device);
-        }
-        if (status == VM_OK)
-        {
             status = vm_serial_if_register_device(comm->serial_if,
-                                                  comm->serial_device);
+                                                  &serial_config,
+                                                  &comm->serial_device);
         }
         if (status == VM_OK)
         {
             status = vm_serial_if_open(comm->serial_if,
-                                       comm->serial_device->name,
-                                       &opened_device);
+                                       comm->serial_device);
         }
         if (status == VM_OK)
         {
-            comm->serial_device = opened_device;
             status = vm_pdur_create(&comm->pdur);
         }
         if (status == VM_OK)

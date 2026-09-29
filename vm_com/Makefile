@@ -73,12 +73,17 @@ CPPFLAGS += -Iinclude \
 
 LIB := $(BUILD_DIR)/libvm_communication.a
 
+ifeq ($(OS),Windows_NT)
+VM_COM_PLATFORM_SOURCE := src/mcal/windows/vm_windows_serial.c
+else
+VM_COM_PLATFORM_SOURCE := src/mcal/posix/vm_posix_serial.c
+endif
+
 SOURCES := \
     src/com/vm_communication.c \
     src/com/vm_value_codec.c \
     src/mcal/vm_mcal_serial.c \
-    src/mcal/windows/vm_windows_serial.c \
-    src/mcal/posix/vm_posix_serial.c \
+    $(VM_COM_PLATFORM_SOURCE) \
     src/if/vm_serial_if.c \
     src/pdur/vm_pdur.c \
     src/services/vm_service.c \

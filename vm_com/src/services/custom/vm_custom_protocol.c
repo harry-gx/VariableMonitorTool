@@ -86,7 +86,7 @@ static size_t wire_payload_size(uint8_t command, uint16_t length)
  * 输出：通过返回值、对象成员或输出参数反馈处理结果。
  * 返回：返回执行结果，具体含义由调用方按接口约定解释。
  */
-uint16_t vm_custom_crc16(const uint8_t *data, size_t size)
+static uint16_t vm_custom_crc16(const uint8_t *data, size_t size)
 {
     uint16_t crc = 0xFFFFu;
     size_t index;
@@ -141,21 +141,6 @@ vm_status_t vm_custom_make_write(uint8_t sequence,
     return vm_custom_encode(&message, out, capacity, written);
 }
 
-/**
- * 函数说明：vm_custom_encoded_size，编码数据到传输格式。
- * 输入：message：协议解析后的消息对象。
- * 输出：通过返回值、对象成员或输出参数反馈处理结果。
- * 返回：返回数量、长度或索引值。
- */
-size_t vm_custom_encoded_size(const vm_custom_message_t *message)
-{
-    if (!message)
-    {
-        return 0u;
-    }
-
-    return wire_payload_size(message->command, message->length) + 13u;
-}
 
 /**
  * 函数说明：vm_custom_encode，编码数据到传输格式。

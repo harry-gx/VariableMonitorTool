@@ -25,10 +25,10 @@ PduR：按设备类型和服务 ID 路由 PDU
   └─ 以太网：后续为 Ethernet IF → PduR → Services
   │
   ▼
-IF：串口抽象层，注册 MCAL 驱动节点，向上提供统一串口访问
+IF：串口抽象层，创建时自动挂接当前平台 MCAL 设备模板，并向上提供统一串口访问
   │
   ▼
-MCAL：平台驱动层，Windows/POSIX 串口驱动独立成节点挂接到 IF；节点挂接统一使用侵入式链表
+MCAL：平台驱动层，Windows/POSIX 串口驱动各自独立，构建时只编译当前平台驱动；运行时设备节点统一使用侵入式链表
 ```
 
 ## 目录职责
@@ -39,11 +39,11 @@ MCAL：平台驱动层，Windows/POSIX 串口驱动独立成节点挂接到 IF�
 | `src/common/include/` | 通信模块内部公共基础设施，当前提供 `vm_list` 侵入式链表 | 内部使用 |
 | `src/com/` | COM 层实现和值编解码 | 内部实现 |
 | `src/com/include/` | COM 内部头文件，例如值编解码接口 | 内部使用 |
-| `src/mcal/` | 平台无关 MCAL 串口公共逻辑 | 内部实现 |
-| `src/mcal/windows/` | Windows 串口 MCAL 驱动节点 | 内部实现 |
-| `src/mcal/posix/` | POSIX 串口 MCAL 驱动节点 | 内部实现 |
-| `src/mcal/include/` | MCAL 内部接口和驱动节点接口 | 内部使用 |
-| `src/if/` | Serial IF，挂接驱动节点，创建、注册、打开、关闭、读写串口设备 | 内部实现 |
+| `src/mcal/` | 默认平台串口设备模板注册，只负责把平台设备模板挂接到 IF 层 | 内部实现 |
+| `src/mcal/windows/` | Windows 串口 MCAL 平台设备模板 | 内部实现 |
+| `src/mcal/posix/` | POSIX 串口 MCAL 平台设备模板 | 内部实现 |
+| `src/mcal/include/` | MCAL 驱动描述结构、操作表和内部注册接口 | 内部使用 |
+| `src/if/` | Serial IF，挂接平台设备模板，选择平台，校验配置，创建、销毁、注册、打开、关闭、读写串口设备 | 内部实现 |
 | `src/if/include/` | IF 内部接口 | 内部使用 |
 | `src/pdur/` | PduR 路由，把下层数据分发到服务，把服务输出送回下层 | 内部实现 |
 | `src/pdur/include/` | PduR 内部接口 | 内部使用 |
@@ -55,7 +55,7 @@ MCAL：平台驱动层，Windows/POSIX 串口驱动独立成节点挂接到 IF�
 
 ## 串口数据流
 
-读变量时，UI 调用 `vm_comm_read_variable()`。COM 层保存 pending 请求，并调用 Services 总入口发起 custom 读请求；custom 服务编码协议帧后通过 PduR 输出，PduR 根据 `VM_PDUR_DEVICE_SERIAL` 调用 Serial IF，Serial IF 调用已匹配的 MCAL 驱动节点发送串口数据。
+读变量时，UI 调用 `vm_comm_read_variable()`。COM 层保存 pending 请求，并调用 Services 总入口发起 custom 读请求；custom 服务编码协议帧后通过 PduR 输出，PduR 根据 `VM_PDUR_DEVICE_SERIAL` 调用 Serial IF，Serial IF 调用已选中平台设备模板对应的操作表发送串口数据。
 
 串口收到数据时，UI 周期调用 `vm_comm_poll()`。COM 层触发 Serial IF 读取；读取到的字节交给 PduR，PduR 路由到 Services 下挂接的 custom 服务；custom 服务完成流式拆包和 CRC 校验，得到完整消息后回调 COM；COM 根据 pending 表把原始字节格式化为十进制显示值和曲线数值，再通过 `vm_comm_event_fn` 上报 UI。
 

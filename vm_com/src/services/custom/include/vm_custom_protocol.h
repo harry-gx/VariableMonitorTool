@@ -64,20 +64,6 @@ vm_status_t vm_custom_make_write(uint8_t sequence,
                                  size_t capacity,
                                  size_t *written);
 /**
- * 函数说明：vm_custom_crc16，计算或校验 CRC。
- * 输入：data：输入或输出的原始字节缓冲区。；size：数据长度或缓冲区容量。
- * 输出：通过返回值、对象成员或输出参数反馈处理结果。
- * 返回：返回执行结果，具体含义由调用方按接口约定解释。
- */
-uint16_t vm_custom_crc16(const uint8_t *data, size_t size);
-/**
- * 函数说明：vm_custom_encoded_size，编码数据到传输格式。
- * 输入：message：协议解析后的消息对象。
- * 输出：通过返回值、对象成员或输出参数反馈处理结果。
- * 返回：返回数量、长度或索引值。
- */
-size_t vm_custom_encoded_size(const vm_custom_message_t *message);
-/**
  * 函数说明：vm_custom_encode，编码数据到传输格式。
  * 输入：message：协议解析后的消息对象。；out：输出对象或结果指针，函数成功时写入有效值。；capacity：函数输入参数，参与本函数的计算、查找或状态更新。；written：函数输入参数，参与本函数的计算、查找或状态更新。
  * 输出：通过返回值、对象成员或输出参数反馈处理结果。

@@ -33,7 +33,7 @@
 按照已设置配置搭建通信链路。
 
 - 输入：通信对象。
-- 输出：串口路径依次创建 `Serial IF -> 注册默认 MCAL 驱动节点 -> 创建串口设备 -> PduR -> Services -> Custom Service`，并打开串口。
+- 输出：串口路径依次创建 `Serial IF -> 注册当前平台 MCAL 设备模板 -> IF 层创建串口设备 -> PduR -> Services -> Custom Service`，并打开串口。
 - 返回：串口成功返回 `VM_OK`；CAN、CANFD、以太网当前返回 `VM_UNSUPPORTED`。
 
 ### `vm_comm_disconnect(vm_comm_t *comm)`
@@ -96,7 +96,7 @@
 
 ### 侵入式链表：`src/common/include/vm_list.h`
 
-通信模块内所有节点挂接统一使用该链表，包括 IF 层驱动节点、IF 层设备节点和 PduR 服务节点。该文件从 `vm_elf_parser/private/vm_list.h` 拷贝到通信模块内部，链表节点由业务结构体内嵌，链表本身不拥有业务对象，避免每个层级重复实现 `next` 指针链。
+通信模块内所有节点挂接统一使用该链表，包括 IF 层平台设备模板节点、IF 层运行时设备节点和 PduR 服务节点。该文件从 `vm_elf_parser/private/vm_list.h` 拷贝到通信模块内部，链表节点由业务结构体内嵌，链表本身不拥有业务对象，避免每个层级重复实现 `next` 指针链。
 
 - 主要内部接口：`INIT_LIST_HEAD()`、`LIST_ADD_TAIL()`、`LIST_DEL()`、`list_entry()`、`LIST_FOR_EACH_ENTRY()`、`LIST_FOR_EACH_ENTRY_SAFE()`。
 - 输入：链表头、内嵌节点或遍历游标。
@@ -115,21 +115,23 @@
 
 ### MCAL 层：`src/mcal/`
 
-负责平台串口驱动适配。
+负责平台串口设备模板定义和默认模板注册。
 
-- `src/mcal/vm_mcal_serial.c`：平台无关公共逻辑，包括配置校验、设备初始化和统一 open/read/write 包装。
-- `src/mcal/windows/vm_windows_serial.c`：Windows 串口驱动节点，使用 Win32 串口 API。
-- `src/mcal/posix/vm_posix_serial.c`：POSIX 串口驱动节点，使用 termios 和非阻塞 fd。
-- 主要内部接口：`vm_mcal_serial_device_configure()`、`vm_mcal_serial_open()`、`vm_mcal_serial_close()`、`vm_mcal_serial_read()`、`vm_mcal_serial_write()`、`vm_mcal_serial_windows_driver_get()`、`vm_mcal_serial_posix_driver_get()`。
+- `src/mcal/include/vm_mcal_serial.h`：只定义串口配置、设备对象、统计信息、操作函数指针和平台设备模板结构，不提供 open/read/write 封装函数。
+- `src/mcal/include/vm_mcal_serial_platform.h`：通信模块内部平台模板查询接口，供 IF 层获取当前编译平台的默认串口设备模板。
+- `src/mcal/vm_mcal_serial.c`：默认平台设备模板注册文件，只把当前编译平台的设备模板注册到 Serial IF。
+- `src/mcal/windows/vm_windows_serial.c`：Windows 串口平台设备模板，使用 Win32 串口 API 实现操作表。
+- `src/mcal/posix/vm_posix_serial.c`：POSIX 串口平台设备模板，使用 termios 和非阻塞 fd 实现操作表。
+- 主要内部接口：`vm_mcal_serial_default_device_get()`，Windows 平台文件提供 `g_vm_windows_serial_device`，POSIX 平台文件提供 `g_vm_posix_serial_device`，构建系统只编译当前平台对应文件。
 
 ### IF 层：`src/if/vm_serial_if.c`
 
-负责串口驱动节点挂接和设备管理。
+负责平台设备模板挂接、平台选择、串口配置校验、设备生命周期和统一读写封装。
 
-- 主要内部接口：`vm_serial_if_register_driver()`、`vm_serial_if_register_default_drivers()`、`vm_serial_if_create_device()`、`vm_serial_if_register_device()`、`vm_serial_if_open()`、`vm_serial_if_read()`、`vm_serial_if_write()`。
-- 输入：MCAL 驱动节点、串口配置、MCAL 串口设备、设备名称、读写缓冲区。驱动节点和设备节点都通过 `vm_list` 挂接。
+- 主要内部接口：`vm_serial_if_create()`、`vm_serial_if_register_device()`、`vm_serial_if_unregister_device()`、`vm_serial_if_open()`、`vm_serial_if_close()`、`vm_serial_if_read()`、`vm_serial_if_write()`。平台模板挂接和运行时设备创建已收敛到 IF 内部，不再向上暴露独立接口。
+- 输入：串口配置、运行时串口设备、读写缓冲区。IF 层只维护一个运行时设备链表，当前平台模板通过指针保存，不单独挂链表。
 - 输出：统一的串口设备对象和读写状态。
-- 说明：上层模块最多调用到 IF 层，不向上暴露 MCAL 细节。
+- 说明：COM、PduR 等上层模块最多调用到 IF 层，不直接调用 MCAL 封装函数或平台 API。
 
 ### PduR 层：`src/pdur/vm_pdur.c`
 

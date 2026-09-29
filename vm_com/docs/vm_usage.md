@@ -78,4 +78,4 @@ vm_comm_destroy(comm);
 
 当前第一阶段只实现串口 + 自定义协议。UI 进程需要周期性调用 `vm_comm_poll()`，模块内部会执行 `Serial IF -> PduR -> Services -> Custom Service -> COM` 的接收处理。
 
-串口驱动节点在 IF 层注册：Windows 平台使用 `src/mcal/windows/vm_windows_serial.c`，POSIX 平台使用 `src/mcal/posix/vm_posix_serial.c`。CAN、CANFD 和以太网配置字段保留，后续接入时仍走同一 COM 业务入口。
+串口平台设备模板在 IF 层注册：Windows 构建只编译并注册 `src/mcal/windows/vm_windows_serial.c`，POSIX 构建只编译并注册 `src/mcal/posix/vm_posix_serial.c`；IF 层创建时自动挂接当前平台模板，并基于该模板创建运行时设备。CAN、CANFD 和以太网配置字段保留，后续接入时仍走同一 COM 业务入口。

@@ -1,7 +1,8 @@
 /*
- * 文件说明：串口 MCAL 层统一接口，定义串口驱动节点、设备对象和底层读写操作表。
+ * 文件说明：串口 MCAL 层设备描述头文件。
  * 所属模块：通信模块 / MCAL 层。
- * 设计要点：Windows、POSIX 等平台串口驱动各自实现独立 driver node，由 Serial IF 层注册和选择。
+ * 设计要点：本文件只提供串口驱动所需的配置结构、设备结构、统计结构和操作函数指针。
+ *           Windows、POSIX 等平台文件只实例化 vm_mcal_serial_device_t 模板；平台选择和设备创建由 IF 层完成。
  */
 
 #ifndef VM_MCAL_SERIAL_H
@@ -12,8 +13,10 @@
 
 VM_BEGIN
 
+/* 宏说明：串口设备名称缓存长度，保存 COMx、/dev/ttyUSBx 等设备名。 */
 #define VM_MCAL_SERIAL_NAME_MAX (128u)
 
+/* 类型说明：串口校验位配置。 */
 typedef enum
 {
     VM_MCAL_SERIAL_PARITY_NONE = 0,
@@ -21,6 +24,7 @@ typedef enum
     VM_MCAL_SERIAL_PARITY_EVEN = 2
 } vm_mcal_serial_parity_t;
 
+/* 类型说明：串口流控配置。 */
 typedef enum
 {
     VM_MCAL_SERIAL_FLOW_NONE = 0,
@@ -28,9 +32,20 @@ typedef enum
     VM_MCAL_SERIAL_FLOW_XON_XOFF = 2
 } vm_mcal_serial_flow_t;
 
+
+/*
+ * 类型说明：串口驱动配置。
+ * 成员说明：
+ * device_name  串口设备名称缓存，例如 COM15 或 /dev/ttyUSB0。
+ * baudrate     串口波特率，单位 bit/s。
+ * data_bits    数据位，支持范围由 IF 层统一校验。
+ * stop_bits    停止位，支持 1 或 2。
+ * parity       校验位，取值参考 vm_mcal_serial_parity_t。
+ * flow_control 流控模式，取值参考 vm_mcal_serial_flow_t。
+ */
 typedef struct
 {
-    const char *device_name;
+    char device_name[VM_MCAL_SERIAL_NAME_MAX];
     uint32_t baudrate;
     uint8_t data_bits;
     uint8_t stop_bits;
@@ -38,6 +53,7 @@ typedef struct
     uint8_t flow_control;
 } vm_mcal_serial_config_t;
 
+/* 类型说明：串口设备收发统计，供上层诊断链路质量。 */
 typedef struct
 {
     uint64_t rx_bytes;
@@ -48,118 +64,61 @@ typedef struct
 } vm_mcal_serial_stats_t;
 
 typedef struct vm_mcal_serial_device vm_mcal_serial_device_t;
-typedef struct vm_mcal_serial_driver vm_mcal_serial_driver_t;
 
+/* 函数指针说明：打开平台串口设备。 */
 typedef vm_status_t (*vm_mcal_serial_open_fn)(
     vm_mcal_serial_device_t *device);
+
+/* 函数指针说明：关闭平台串口设备。 */
 typedef vm_status_t (*vm_mcal_serial_close_fn)(
     vm_mcal_serial_device_t *device);
+
+/* 函数指针说明：从平台串口设备读取数据。 */
 typedef vm_status_t (*vm_mcal_serial_read_fn)(
     vm_mcal_serial_device_t *device,
     uint8_t *buffer,
     size_t capacity,
     size_t *read_size);
+
+/* 函数指针说明：向平台串口设备写入数据。 */
 typedef vm_status_t (*vm_mcal_serial_write_fn)(
     vm_mcal_serial_device_t *device,
     const uint8_t *data,
     size_t size);
-typedef vm_status_t (*vm_mcal_serial_param_set_fn)(
-    vm_mcal_serial_device_t *device,
-    const vm_mcal_serial_config_t *config);
-typedef vm_status_t (*vm_mcal_serial_param_get_fn)(
-    const vm_mcal_serial_device_t *device,
-    vm_mcal_serial_config_t *config);
 
+
+/* 类型说明：串口设备操作表，由具体平台驱动文件实例化。 */
 typedef struct
 {
     vm_mcal_serial_open_fn open;
     vm_mcal_serial_close_fn close;
     vm_mcal_serial_read_fn read;
     vm_mcal_serial_write_fn write;
-    vm_mcal_serial_param_set_fn param_set;
-    vm_mcal_serial_param_get_fn param_get;
 } vm_mcal_serial_ops_t;
 
-typedef uint8_t (*vm_mcal_serial_driver_match_fn)(
-    const vm_mcal_serial_config_t *config);
-typedef vm_status_t (*vm_mcal_serial_driver_create_fn)(
-    const vm_mcal_serial_config_t *config,
-    vm_mcal_serial_device_t **out_device);
-
-struct vm_mcal_serial_driver
-{
-    const char *driver_name;
-    vm_mcal_serial_driver_match_fn match;
-    vm_mcal_serial_driver_create_fn create;
-};
-
+/*
+ * 类型说明：串口 MCAL 设备对象。
+ * 成员说明：
+ * node                侵入式链表节点，由 IF 层用于挂接平台模板或运行时设备。
+ * platform_name       平台设备模板名称，例如 windows_serial 或 posix_serial。
+ * config              运行时串口配置；config.device_name 是唯一保存的串口设备名。
+ * ops                 平台操作表，平台文件实例化模板时提供。
+ * platform_context_size 平台私有上下文大小，IF 层据此分配上下文内存。
+ * platform_context      平台私有上下文指针，实际设备对象创建后由 IF 层分配。
+ * stats               收发统计。
+ * opened              打开状态。
+ */
 struct vm_mcal_serial_device
 {
     list_head_t node;
-    char name[VM_MCAL_SERIAL_NAME_MAX];
+    const char *platform_name;
     vm_mcal_serial_config_t config;
-    const vm_mcal_serial_driver_t *driver;
     const vm_mcal_serial_ops_t *ops;
-    void *driver_context;
+    size_t platform_context_size;
+    void *platform_context;
     vm_mcal_serial_stats_t stats;
     uint8_t opened;
 };
-
-/**
- * 函数说明：校验串口配置是否合法。
- * 输入：config，待校验的串口配置。
- * 输出：无。
- * 返回：VM_OK 表示合法，其它状态码表示配置缺失或取值不支持。
- */
-vm_status_t vm_mcal_serial_config_validate(
-    const vm_mcal_serial_config_t *config);
-
-/**
- * 函数说明：初始化一个由具体平台驱动分配的串口设备对象。
- * 输入：device，设备对象；driver，所属驱动节点；config，串口配置；ops，设备操作表；driver_context，平台私有上下文。
- * 输出：device 填入名称、配置、驱动节点、操作表和私有上下文。
- * 返回：VM_OK 表示成功，其它状态码表示参数非法。
- */
-vm_status_t vm_mcal_serial_device_configure(
-    vm_mcal_serial_device_t *device,
-    const vm_mcal_serial_driver_t *driver,
-    const vm_mcal_serial_config_t *config,
-    const vm_mcal_serial_ops_t *ops,
-    void *driver_context);
-
-/**
- * 函数说明：销毁串口 MCAL 设备。
- * 输入：device，待销毁的设备对象。
- * 输出：设备会先关闭，再释放平台上下文和设备对象。
- * 返回：无。
- */
-void vm_mcal_serial_destroy(vm_mcal_serial_device_t *device);
-
-vm_status_t vm_mcal_serial_open(vm_mcal_serial_device_t *device);
-vm_status_t vm_mcal_serial_close(vm_mcal_serial_device_t *device);
-vm_status_t vm_mcal_serial_read(vm_mcal_serial_device_t *device,
-                                uint8_t *buffer,
-                                size_t capacity,
-                                size_t *read_size);
-vm_status_t vm_mcal_serial_write(vm_mcal_serial_device_t *device,
-                                 const uint8_t *data,
-                                 size_t size);
-
-/**
- * 函数说明：获取 Windows 串口驱动节点。
- * 输入：无。
- * 输出：无。
- * 返回：Windows 平台驱动节点；非 Windows 构建中该节点不匹配任何设备。
- */
-const vm_mcal_serial_driver_t *vm_mcal_serial_windows_driver_get(void);
-
-/**
- * 函数说明：获取 POSIX 串口驱动节点。
- * 输入：无。
- * 输出：无。
- * 返回：POSIX 平台驱动节点；Windows 构建中该节点不匹配任何设备。
- */
-const vm_mcal_serial_driver_t *vm_mcal_serial_posix_driver_get(void);
 
 VM_END
 

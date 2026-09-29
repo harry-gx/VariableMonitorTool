@@ -1,7 +1,7 @@
 /*
- * 文件说明：串口 IF 层接口，负责挂接平台串口驱动节点并向上提供统一串口访问能力。
+ * 文件说明：串口 IF 层接口，负责挂接当前平台串口设备模板并向上提供统一串口访问能力。
  * 所属模块：通信模块 / IF 层。
- * 设计要点：上层最多调用到 IF 层；Windows/POSIX 等 MCAL 驱动作为独立节点注册到本层。
+ * 设计要点：上层最多调用到 IF 层；MCAL 文件只提供设备模板，运行时设备创建、注册、注销、打开、关闭和读写由本层统一封装。
  */
 
 #ifndef VM_SERIAL_IF_H
@@ -11,90 +11,53 @@
 
 VM_BEGIN
 
-/* 类型说明：串口 IF 控制块，内部保存已注册驱动节点、设备链表和当前活动设备。 */
+/* 类型说明：串口 IF 控制块，内部保存当前平台模板、运行时设备链表和当前活动设备。 */
 typedef struct vm_serial_if vm_serial_if_t;
 
 /**
  * 函数说明：创建串口 IF 控制块。
  * 输入：out_if，输出控制块指针。
- * 输出：成功时 *out_if 指向可注册驱动和设备的 IF 控制块。
- * 返回：VM_OK 表示成功，其它状态码表示参数错误或内存不足。
+ * 输出：成功时 *out_if 指向已挂接当前平台串口模板的 IF 控制块。
+ * 返回：VM_OK 表示成功，其它状态码表示参数错误、内存不足或当前平台不支持串口。
  */
 vm_status_t vm_serial_if_create(vm_serial_if_t **out_if);
 
 /**
  * 函数说明：销毁串口 IF 控制块。
  * 输入：serial_if，待销毁的 IF 控制块。
- * 输出：关闭当前活动设备，并释放 IF 层保存的驱动链表节点。
+ * 输出：关闭并释放所有已注册设备，释放 IF 层内部节点。
  * 返回：无。
  */
 void vm_serial_if_destroy(vm_serial_if_t *serial_if);
 
 /**
- * 函数说明：注册一个 MCAL 串口驱动节点到 IF 层。
- * 输入：serial_if，IF 控制块；driver，平台驱动节点。
- * 输出：driver 加入 IF 内部驱动链表。
- * 返回：VM_OK 表示成功，其它状态码表示参数错误、内存不足或重复注册。
- */
-vm_status_t vm_serial_if_register_driver(
-    vm_serial_if_t *serial_if,
-    const vm_mcal_serial_driver_t *driver);
-
-/**
- * 函数说明：注册本模块内置的默认串口驱动节点。
- * 输入：serial_if，IF 控制块。
- * 输出：Windows 和 POSIX 驱动节点被注册；运行时由 match 函数选择有效节点。
- * 返回：VM_OK 表示成功，其它状态码表示注册失败。
- */
-vm_status_t vm_serial_if_register_default_drivers(vm_serial_if_t *serial_if);
-
-/**
- * 函数说明：通过已注册驱动创建串口 MCAL 设备。
+ * 函数说明：按串口配置创建并注册一个运行时串口设备。
  * 输入：serial_if，IF 控制块；config，串口配置；out_device，输出设备对象。
- * 输出：成功时 *out_device 指向匹配平台驱动创建的设备对象。
- * 返回：VM_OK 表示成功，VM_UNSUPPORTED 表示没有驱动匹配，其它状态码表示创建失败。
+ * 输出：成功时 *out_device 指向已注册设备。
+ * 返回：VM_OK 表示成功，其它状态码表示配置非法、重复注册、内存不足或当前平台不支持。
  */
-vm_status_t vm_serial_if_create_device(
+vm_status_t vm_serial_if_register_device(
     vm_serial_if_t *serial_if,
     const vm_mcal_serial_config_t *config,
     vm_mcal_serial_device_t **out_device);
 
 /**
- * 函数说明：把一个 MCAL 串口设备注册到 IF 层。
- * 输入：serial_if，IF 控制块；device，待注册 MCAL 设备。
- * 输出：设备加入 IF 内部设备链表。
- * 返回：VM_OK 表示成功，其它状态码表示参数错误或重复注册。
- */
-vm_status_t vm_serial_if_register_device(vm_serial_if_t *serial_if,
-                                         vm_mcal_serial_device_t *device);
-
-/**
- * 函数说明：从 IF 层注销一个 MCAL 串口设备。
- * 输入：serial_if，IF 控制块；device，待注销 MCAL 设备。
- * 输出：设备从 IF 内部链表移除，如当前正在使用则先关闭。
+ * 函数说明：注销并释放一个运行时串口设备。
+ * 输入：serial_if，IF 控制块；device，待注销设备。
+ * 输出：设备从 IF 内部链表移除，若已打开则先关闭，然后释放设备对象。
  * 返回：VM_OK 表示成功，其它状态码表示未找到或参数错误。
  */
 vm_status_t vm_serial_if_unregister_device(vm_serial_if_t *serial_if,
                                            vm_mcal_serial_device_t *device);
 
 /**
- * 函数说明：按设备名查找已注册串口设备。
- * 输入：serial_if，IF 控制块；name，设备名称。
- * 输出：无。
- * 返回：找到时返回设备指针，未找到返回 NULL。
- */
-vm_mcal_serial_device_t *vm_serial_if_find_device(vm_serial_if_t *serial_if,
-                                                  const char *name);
-
-/**
- * 函数说明：打开 IF 层中的指定串口设备。
- * 输入：serial_if，IF 控制块；name，设备名称；out_device，输出活动设备，可为 NULL。
- * 输出：成功时设备被打开并成为当前活动设备。
- * 返回：VM_OK 表示成功，其它状态码表示未找到、忙碌或打开失败。
+ * 函数说明：打开 IF 层中已注册的串口设备。
+ * 输入：serial_if，IF 控制块；device，待打开设备。
+ * 输出：成功时 device 成为当前活动设备。
+ * 返回：VM_OK 表示成功，其它状态码表示设备未注册、忙碌或底层打开失败。
  */
 vm_status_t vm_serial_if_open(vm_serial_if_t *serial_if,
-                              const char *name,
-                              vm_mcal_serial_device_t **out_device);
+                              vm_mcal_serial_device_t *device);
 
 /**
  * 函数说明：关闭 IF 层中的指定串口设备。

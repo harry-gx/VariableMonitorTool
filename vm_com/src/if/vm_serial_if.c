@@ -1,25 +1,20 @@
 /*
- * 文件说明：串口 IF 层实现，统一管理平台串口驱动节点和 MCAL 设备对象。
+ * 文件说明：串口 IF 层实现，统一管理当前平台串口设备模板和运行时 MCAL 设备对象。
  * 所属模块：通信模块 / IF 层。
- * 设计要点：驱动挂接节点和设备节点均使用通信模块内拷贝的 vm_list.h 侵入式链表。
+ * 设计要点：IF 层只维护一个运行时设备链表，当前平台模板用指针保存，不单独挂链表。
  */
 
 #include "vm_serial_if.h"
 
 #include "vm_list.h"
+#include "vm_mcal_serial_platform.h"
 
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct
-{
-    list_head_t node;
-    const vm_mcal_serial_driver_t *driver;
-} vm_serial_if_driver_node_t;
-
 struct vm_serial_if
 {
-    list_head_t driver_list;
+    const vm_mcal_serial_device_t *platform_device;
     list_head_t device_list;
     vm_mcal_serial_device_t *active_device;
 };
@@ -37,24 +32,92 @@ static uint8_t vm_serial_if_name_equal(const char *left, const char *right)
     return equal;
 }
 
-static uint8_t vm_serial_if_driver_exists(
-    vm_serial_if_t *serial_if,
-    const vm_mcal_serial_driver_t *driver)
+static vm_status_t vm_serial_if_config_validate(
+    const vm_mcal_serial_config_t *config)
 {
-    list_head_t *node;
-    vm_serial_if_driver_node_t *entry;
+    vm_status_t status;
+
+    status = VM_OK;
+    if ((config == NULL) || (config->device_name[0] == '\0') ||
+        (config->baudrate == 0u))
+    {
+        status = VM_INVALID;
+    }
+    else if ((config->data_bits < 5u) || (config->data_bits > 8u) ||
+             ((config->stop_bits != 1u) && (config->stop_bits != 2u)) ||
+             (config->parity > (uint8_t)VM_MCAL_SERIAL_PARITY_EVEN) ||
+             (config->flow_control > (uint8_t)VM_MCAL_SERIAL_FLOW_XON_XOFF))
+    {
+        status = VM_FORMAT;
+    }
+    else
+    {
+        /* 配置合法，无需额外处理。 */
+    }
+
+    return status;
+}
+
+static uint8_t vm_serial_if_device_ops_valid(
+    const vm_mcal_serial_device_t *device)
+{
+    uint8_t valid;
+
+    valid = 0u;
+    if ((device != NULL) && (device->ops != NULL) &&
+        (device->ops->open != NULL) && (device->ops->close != NULL) &&
+        (device->ops->read != NULL) && (device->ops->write != NULL))
+    {
+        valid = 1u;
+    }
+
+    return valid;
+}
+
+static uint8_t vm_serial_if_device_registered(
+    const vm_serial_if_t *serial_if,
+    const vm_mcal_serial_device_t *device)
+{
+    const list_head_t *node;
+    const vm_mcal_serial_device_t *current;
+    uint8_t registered;
+
+    registered = 0u;
+    if ((serial_if != NULL) && (device != NULL))
+    {
+        node = serial_if->device_list.next;
+        while (node != &serial_if->device_list)
+        {
+            current = list_entry(node, vm_mcal_serial_device_t, node);
+            if (current == device)
+            {
+                registered = 1u;
+                break;
+            }
+            node = node->next;
+        }
+    }
+
+    return registered;
+}
+
+static uint8_t vm_serial_if_device_name_exists(
+    const vm_serial_if_t *serial_if,
+    const char *device_name)
+{
+    const list_head_t *node;
+    const vm_mcal_serial_device_t *current;
     uint8_t exists;
 
     exists = 0u;
-    if ((serial_if != NULL) && (driver != NULL))
+    if ((serial_if != NULL) && (device_name != NULL))
     {
-        node = serial_if->driver_list.next;
-        while (node != &serial_if->driver_list)
+        node = serial_if->device_list.next;
+        while (node != &serial_if->device_list)
         {
-            entry = list_entry(node, vm_serial_if_driver_node_t, node);
-            if ((entry->driver == driver) ||
-                (vm_serial_if_name_equal(entry->driver->driver_name,
-                                         driver->driver_name) != 0u))
+            current = list_entry(node, vm_mcal_serial_device_t, node);
+            if (vm_serial_if_name_equal(current->config.device_name,
+                                        device_name) != 0u)
             {
                 exists = 1u;
                 break;
@@ -66,30 +129,58 @@ static uint8_t vm_serial_if_driver_exists(
     return exists;
 }
 
-static void vm_serial_if_free_driver_nodes(vm_serial_if_t *serial_if)
+static vm_status_t vm_serial_if_device_open(vm_mcal_serial_device_t *device)
 {
-    list_head_t *node;
-    list_head_t *next_node;
-    vm_serial_if_driver_node_t *entry;
+    vm_status_t status;
 
-    if (serial_if != NULL)
+    if (vm_serial_if_device_ops_valid(device) == 0u)
     {
-        node = serial_if->driver_list.next;
-        while (node != &serial_if->driver_list)
-        {
-            next_node = node->next;
-            entry = list_entry(node, vm_serial_if_driver_node_t, node);
-            LIST_DEL(&entry->node);
-            free(entry);
-            node = next_node;
-        }
+        status = VM_INVALID;
+    }
+    else
+    {
+        status = device->ops->open(device);
+    }
+
+    return status;
+}
+
+static vm_status_t vm_serial_if_device_close(vm_mcal_serial_device_t *device)
+{
+    vm_status_t status;
+
+    if (device == NULL)
+    {
+        status = VM_OK;
+    }
+    else if ((device->ops == NULL) || (device->ops->close == NULL))
+    {
+        status = VM_INVALID;
+    }
+    else
+    {
+        status = device->ops->close(device);
+    }
+
+    return status;
+}
+
+static void vm_serial_if_device_destroy(vm_mcal_serial_device_t *device)
+{
+    if (device != NULL)
+    {
+        (void)vm_serial_if_device_close(device);
+        free(device->platform_context);
+        device->platform_context = NULL;
+        free(device);
     }
 }
 
-static void vm_serial_if_detach_devices(vm_serial_if_t *serial_if)
+static void vm_serial_if_free_devices(vm_serial_if_t *serial_if)
 {
     list_head_t *node;
     list_head_t *next_node;
+    vm_mcal_serial_device_t *device;
 
     if (serial_if != NULL)
     {
@@ -97,17 +188,91 @@ static void vm_serial_if_detach_devices(vm_serial_if_t *serial_if)
         while (node != &serial_if->device_list)
         {
             next_node = node->next;
-            LIST_DEL(node);
-            INIT_LIST_HEAD(node);
+            device = list_entry(node, vm_mcal_serial_device_t, node);
+            LIST_DEL(&device->node);
+            INIT_LIST_HEAD(&device->node);
+            vm_serial_if_device_destroy(device);
             node = next_node;
         }
         serial_if->active_device = NULL;
     }
 }
 
+static vm_status_t vm_serial_if_apply_config(
+    vm_mcal_serial_device_t *device,
+    const vm_mcal_serial_device_t *platform_device,
+    const vm_mcal_serial_config_t *config)
+{
+    vm_status_t status;
+
+    if ((device == NULL) || (platform_device == NULL) || (config == NULL))
+    {
+        status = VM_INVALID;
+    }
+    else
+    {
+        (void)memset(device, 0, sizeof(*device));
+        INIT_LIST_HEAD(&device->node);
+        device->platform_name = platform_device->platform_name;
+        device->ops = platform_device->ops;
+        device->platform_context_size = platform_device->platform_context_size;
+        device->config = *config;
+        device->config.device_name[sizeof(device->config.device_name) - 1u] = '\0';
+        status = VM_OK;
+    }
+
+    return status;
+}
+
+static vm_status_t vm_serial_if_create_from_platform(
+    const vm_mcal_serial_device_t *platform_device,
+    const vm_mcal_serial_config_t *config,
+    vm_mcal_serial_device_t **out_device)
+{
+    vm_mcal_serial_device_t *device;
+    void *context;
+    vm_status_t status;
+
+    if ((platform_device == NULL) || (config == NULL) ||
+        (out_device == NULL) || (platform_device->platform_context_size == 0u) ||
+        (vm_serial_if_device_ops_valid(platform_device) == 0u))
+    {
+        status = VM_INVALID;
+    }
+    else
+    {
+        *out_device = NULL;
+        device = (vm_mcal_serial_device_t *)calloc(1u, sizeof(*device));
+        context = calloc(1u, platform_device->platform_context_size);
+        if ((device == NULL) || (context == NULL))
+        {
+            free(device);
+            free(context);
+            status = VM_NOMEM;
+        }
+        else
+        {
+            status = vm_serial_if_apply_config(device, platform_device, config);
+            if (status == VM_OK)
+            {
+                device->platform_context = context;
+                *out_device = device;
+            }
+            else
+            {
+                free(context);
+                free(device);
+            }
+        }
+    }
+
+    return status;
+}
+
 vm_status_t vm_serial_if_create(vm_serial_if_t **out_if)
 {
     vm_serial_if_t *serial_if;
+    const vm_mcal_serial_device_t *platform_device;
     vm_status_t status;
 
     if (out_if == NULL)
@@ -117,17 +282,25 @@ vm_status_t vm_serial_if_create(vm_serial_if_t **out_if)
     else
     {
         *out_if = NULL;
-        serial_if = (vm_serial_if_t *)calloc(1u, sizeof(*serial_if));
-        if (serial_if == NULL)
+        platform_device = vm_mcal_serial_default_device_get();
+        if (platform_device == NULL)
         {
-            status = VM_NOMEM;
+            status = VM_UNSUPPORTED;
         }
         else
         {
-            INIT_LIST_HEAD(&serial_if->driver_list);
-            INIT_LIST_HEAD(&serial_if->device_list);
-            *out_if = serial_if;
-            status = VM_OK;
+            serial_if = (vm_serial_if_t *)calloc(1u, sizeof(*serial_if));
+            if (serial_if == NULL)
+            {
+                status = VM_NOMEM;
+            }
+            else
+            {
+                serial_if->platform_device = platform_device;
+                INIT_LIST_HEAD(&serial_if->device_list);
+                *out_if = serial_if;
+                status = VM_OK;
+            }
         }
     }
 
@@ -139,72 +312,17 @@ void vm_serial_if_destroy(vm_serial_if_t *serial_if)
     if (serial_if != NULL)
     {
         vm_serial_if_close(serial_if, NULL);
-        vm_serial_if_detach_devices(serial_if);
-        vm_serial_if_free_driver_nodes(serial_if);
+        vm_serial_if_free_devices(serial_if);
         free(serial_if);
     }
 }
 
-vm_status_t vm_serial_if_register_driver(
-    vm_serial_if_t *serial_if,
-    const vm_mcal_serial_driver_t *driver)
-{
-    vm_serial_if_driver_node_t *entry;
-    vm_status_t status;
-
-    if ((serial_if == NULL) || (driver == NULL) ||
-        (driver->driver_name == NULL) || (driver->match == NULL) ||
-        (driver->create == NULL))
-    {
-        status = VM_INVALID;
-    }
-    else if (vm_serial_if_driver_exists(serial_if, driver) != 0u)
-    {
-        status = VM_DUPLICATE;
-    }
-    else
-    {
-        entry = (vm_serial_if_driver_node_t *)calloc(1u, sizeof(*entry));
-        if (entry == NULL)
-        {
-            status = VM_NOMEM;
-        }
-        else
-        {
-            INIT_LIST_HEAD(&entry->node);
-            entry->driver = driver;
-            LIST_ADD_TAIL(&entry->node, &serial_if->driver_list);
-            status = VM_OK;
-        }
-    }
-
-    return status;
-}
-
-vm_status_t vm_serial_if_register_default_drivers(vm_serial_if_t *serial_if)
-{
-    vm_status_t status;
-
-    status = vm_serial_if_register_driver(
-        serial_if,
-        vm_mcal_serial_windows_driver_get());
-    if (status == VM_OK)
-    {
-        status = vm_serial_if_register_driver(
-            serial_if,
-            vm_mcal_serial_posix_driver_get());
-    }
-
-    return status;
-}
-
-vm_status_t vm_serial_if_create_device(
+vm_status_t vm_serial_if_register_device(
     vm_serial_if_t *serial_if,
     const vm_mcal_serial_config_t *config,
     vm_mcal_serial_device_t **out_device)
 {
-    list_head_t *node;
-    vm_serial_if_driver_node_t *entry;
+    vm_mcal_serial_device_t *device;
     vm_status_t status;
 
     if (out_device == NULL)
@@ -214,60 +332,34 @@ vm_status_t vm_serial_if_create_device(
     else
     {
         *out_device = NULL;
-        if ((serial_if == NULL) || (config == NULL))
+        status = vm_serial_if_config_validate(config);
+        if ((serial_if == NULL) || (status != VM_OK))
         {
-            status = VM_INVALID;
+            if (serial_if == NULL)
+            {
+                status = VM_INVALID;
+            }
+        }
+        else if (vm_serial_if_device_name_exists(serial_if,
+                                                 config->device_name) != 0u)
+        {
+            status = VM_DUPLICATE;
+        }
+        else if (serial_if->platform_device == NULL)
+        {
+            status = VM_UNSUPPORTED;
         }
         else
         {
-            status = VM_UNSUPPORTED;
-            node = serial_if->driver_list.next;
-            while (node != &serial_if->driver_list)
+            device = NULL;
+            status = vm_serial_if_create_from_platform(serial_if->platform_device,
+                                                       config,
+                                                       &device);
+            if (status == VM_OK)
             {
-                entry = list_entry(node, vm_serial_if_driver_node_t, node);
-                if (entry->driver->match(config) != 0u)
-                {
-                    status = entry->driver->create(config, out_device);
-                    break;
-                }
-                node = node->next;
+                LIST_ADD_TAIL(&device->node, &serial_if->device_list);
+                *out_device = device;
             }
-        }
-    }
-
-    return status;
-}
-
-vm_status_t vm_serial_if_register_device(vm_serial_if_t *serial_if,
-                                         vm_mcal_serial_device_t *device)
-{
-    list_head_t *node;
-    vm_mcal_serial_device_t *current;
-    vm_status_t status;
-
-    if ((serial_if == NULL) || (device == NULL) || (device->name[0] == '\0'))
-    {
-        status = VM_INVALID;
-    }
-    else
-    {
-        status = VM_OK;
-        node = serial_if->device_list.next;
-        while (node != &serial_if->device_list)
-        {
-            current = list_entry(node, vm_mcal_serial_device_t, node);
-            if ((current == device) ||
-                (vm_serial_if_name_equal(current->name, device->name) != 0u))
-            {
-                status = VM_DUPLICATE;
-                break;
-            }
-            node = node->next;
-        }
-
-        if (status == VM_OK)
-        {
-            LIST_ADD_TAIL(&device->node, &serial_if->device_list);
         }
     }
 
@@ -277,104 +369,55 @@ vm_status_t vm_serial_if_register_device(vm_serial_if_t *serial_if,
 vm_status_t vm_serial_if_unregister_device(vm_serial_if_t *serial_if,
                                            vm_mcal_serial_device_t *device)
 {
-    list_head_t *node;
-    vm_mcal_serial_device_t *current;
     vm_status_t status;
 
     if ((serial_if == NULL) || (device == NULL))
     {
         status = VM_INVALID;
     }
-    else
+    else if (vm_serial_if_device_registered(serial_if, device) == 0u)
     {
         status = VM_NOT_FOUND;
-        node = serial_if->device_list.next;
-        while (node != &serial_if->device_list)
+    }
+    else
+    {
+        if (serial_if->active_device == device)
         {
-            current = list_entry(node, vm_mcal_serial_device_t, node);
-            if (current == device)
-            {
-                if (serial_if->active_device == current)
-                {
-                    vm_serial_if_close(serial_if, current);
-                }
-                LIST_DEL(&current->node);
-                INIT_LIST_HEAD(&current->node);
-                status = VM_OK;
-                break;
-            }
-            node = node->next;
+            vm_serial_if_close(serial_if, device);
         }
+        LIST_DEL(&device->node);
+        INIT_LIST_HEAD(&device->node);
+        vm_serial_if_device_destroy(device);
+        status = VM_OK;
     }
 
     return status;
 }
 
-vm_mcal_serial_device_t *vm_serial_if_find_device(vm_serial_if_t *serial_if,
-                                                  const char *name)
-{
-    list_head_t *node;
-    vm_mcal_serial_device_t *current;
-    vm_mcal_serial_device_t *found;
-
-    found = NULL;
-    if ((serial_if != NULL) && (name != NULL))
-    {
-        node = serial_if->device_list.next;
-        while (node != &serial_if->device_list)
-        {
-            current = list_entry(node, vm_mcal_serial_device_t, node);
-            if (vm_serial_if_name_equal(current->name, name) != 0u)
-            {
-                found = current;
-                break;
-            }
-            node = node->next;
-        }
-    }
-
-    return found;
-}
-
 vm_status_t vm_serial_if_open(vm_serial_if_t *serial_if,
-                              const char *name,
-                              vm_mcal_serial_device_t **out_device)
+                              vm_mcal_serial_device_t *device)
 {
-    vm_mcal_serial_device_t *device;
     vm_status_t status;
 
-    if (out_device != NULL)
-    {
-        *out_device = NULL;
-    }
-
-    if ((serial_if == NULL) || (name == NULL))
+    if ((serial_if == NULL) || (device == NULL))
     {
         status = VM_INVALID;
     }
+    else if (vm_serial_if_device_registered(serial_if, device) == 0u)
+    {
+        status = VM_NOT_FOUND;
+    }
     else
     {
-        device = vm_serial_if_find_device(serial_if, name);
-        if (device == NULL)
+        if ((serial_if->active_device != NULL) &&
+            (serial_if->active_device != device))
         {
-            status = VM_NOT_FOUND;
+            vm_serial_if_close(serial_if, serial_if->active_device);
         }
-        else
+        status = vm_serial_if_device_open(device);
+        if (status == VM_OK)
         {
-            if ((serial_if->active_device != NULL) &&
-                (serial_if->active_device != device))
-            {
-                vm_serial_if_close(serial_if, serial_if->active_device);
-            }
-            status = vm_mcal_serial_open(device);
-            if (status == VM_OK)
-            {
-                serial_if->active_device = device;
-                if (out_device != NULL)
-                {
-                    *out_device = device;
-                }
-            }
+            serial_if->active_device = device;
         }
     }
 
@@ -396,7 +439,7 @@ void vm_serial_if_close(vm_serial_if_t *serial_if,
 
         if (target != NULL)
         {
-            (void)vm_mcal_serial_close(target);
+            (void)vm_serial_if_device_close(target);
             if (serial_if->active_device == target)
             {
                 serial_if->active_device = NULL;
@@ -457,12 +500,15 @@ vm_status_t vm_serial_if_read(vm_serial_if_t *serial_if,
         {
             status = VM_BUSY;
         }
+        else if ((buffer == NULL) || (capacity == 0u) ||
+                 (read_size == NULL) || (target->ops == NULL) ||
+                 (target->ops->read == NULL))
+        {
+            status = VM_INVALID;
+        }
         else
         {
-            status = vm_mcal_serial_read(target,
-                                         buffer,
-                                         capacity,
-                                         read_size);
+            status = target->ops->read(target, buffer, capacity, read_size);
         }
     }
 
@@ -492,9 +538,14 @@ vm_status_t vm_serial_if_write(vm_serial_if_t *serial_if,
         {
             status = VM_BUSY;
         }
+        else if (((data == NULL) && (size > 0u)) ||
+                 (target->ops == NULL) || (target->ops->write == NULL))
+        {
+            status = VM_INVALID;
+        }
         else
         {
-            status = vm_mcal_serial_write(target, data, size);
+            status = target->ops->write(target, data, size);
         }
     }
 

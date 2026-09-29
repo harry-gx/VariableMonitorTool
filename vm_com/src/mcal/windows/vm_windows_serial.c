@@ -1,16 +1,13 @@
 /*
- * 文件说明：Windows 平台串口 MCAL 驱动节点实现。
- * 所属模块：通信模块 / MCAL 层 / Windows 驱动节点。
- * 设计要点：本文件只处理 Windows 串口 API，作为独立驱动节点挂接到 Serial IF 层。
+ * 文件说明：Windows 平台串口 MCAL 设备模板和操作表实现。
+ * 所属模块：通信模块 / MCAL 层 / Windows 平台。
+ * 设计要点：本文件只处理 Windows 串口 API，并向 IF 层提供一个 vm_mcal_serial_device_t 平台模板。
  */
 
 #include "vm_mcal_serial.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-
-#ifdef _WIN32
 #include <windows.h>
 
 typedef struct
@@ -27,32 +24,25 @@ static vm_status_t vm_windows_serial_read(vm_mcal_serial_device_t *device,
 static vm_status_t vm_windows_serial_write(vm_mcal_serial_device_t *device,
                                            const uint8_t *data,
                                            size_t size);
-static vm_status_t vm_windows_serial_param_set(
-    vm_mcal_serial_device_t *device,
-    const vm_mcal_serial_config_t *config);
-static vm_status_t vm_windows_serial_param_get(
-    const vm_mcal_serial_device_t *device,
-    vm_mcal_serial_config_t *config);
-static uint8_t vm_windows_serial_match(const vm_mcal_serial_config_t *config);
-static vm_status_t vm_windows_serial_create(
-    const vm_mcal_serial_config_t *config,
-    vm_mcal_serial_device_t **out_device);
 
 static const vm_mcal_serial_ops_t g_vm_windows_serial_ops =
 {
     vm_windows_serial_open,
     vm_windows_serial_close,
     vm_windows_serial_read,
-    vm_windows_serial_write,
-    vm_windows_serial_param_set,
-    vm_windows_serial_param_get
+    vm_windows_serial_write
 };
 
-static const vm_mcal_serial_driver_t g_vm_windows_serial_driver =
+const vm_mcal_serial_device_t g_vm_windows_serial_device =
 {
+    { NULL, NULL },
     "windows_serial",
-    vm_windows_serial_match,
-    vm_windows_serial_create
+    { { '\0' }, 0u, 0u, 0u, 0u, 0u },
+    &g_vm_windows_serial_ops,
+    sizeof(vm_windows_serial_context_t),
+    NULL,
+    { 0u, 0u, 0u, 0u, 0u },
+    0u
 };
 
 static uint8_t vm_windows_serial_make_name(const char *input,
@@ -164,7 +154,7 @@ static vm_windows_serial_context_t *vm_windows_serial_context(
     context = NULL;
     if (device != NULL)
     {
-        context = (vm_windows_serial_context_t *)device->driver_context;
+        context = (vm_windows_serial_context_t *)device->platform_context;
     }
 
     return context;
@@ -337,143 +327,3 @@ static vm_status_t vm_windows_serial_write(vm_mcal_serial_device_t *device,
     return status;
 }
 
-static vm_status_t vm_windows_serial_param_set(
-    vm_mcal_serial_device_t *device,
-    const vm_mcal_serial_config_t *config)
-{
-    void *context;
-    vm_status_t status;
-
-    if ((device == NULL) || (config == NULL) || (device->opened != 0u))
-    {
-        status = VM_INVALID;
-    }
-    else
-    {
-        context = device->driver_context;
-        status = vm_mcal_serial_device_configure(device,
-                                                 &g_vm_windows_serial_driver,
-                                                 config,
-                                                 &g_vm_windows_serial_ops,
-                                                 context);
-    }
-
-    return status;
-}
-
-static vm_status_t vm_windows_serial_param_get(
-    const vm_mcal_serial_device_t *device,
-    vm_mcal_serial_config_t *config)
-{
-    vm_status_t status;
-
-    if ((device == NULL) || (config == NULL))
-    {
-        status = VM_INVALID;
-    }
-    else
-    {
-        *config = device->config;
-        status = VM_OK;
-    }
-
-    return status;
-}
-
-static uint8_t vm_windows_serial_match(const vm_mcal_serial_config_t *config)
-{
-    uint8_t matched;
-
-    matched = 0u;
-    if (vm_mcal_serial_config_validate(config) == VM_OK)
-    {
-        matched = 1u;
-    }
-
-    return matched;
-}
-
-static vm_status_t vm_windows_serial_create(
-    const vm_mcal_serial_config_t *config,
-    vm_mcal_serial_device_t **out_device)
-{
-    vm_mcal_serial_device_t *device;
-    vm_windows_serial_context_t *context;
-    vm_status_t status;
-
-    if (out_device == NULL)
-    {
-        status = VM_INVALID;
-    }
-    else
-    {
-        *out_device = NULL;
-        context = (vm_windows_serial_context_t *)calloc(1u, sizeof(*context));
-        device = (vm_mcal_serial_device_t *)calloc(1u, sizeof(*device));
-        if ((context == NULL) || (device == NULL))
-        {
-            free(context);
-            free(device);
-            status = VM_NOMEM;
-        }
-        else
-        {
-            context->handle = INVALID_HANDLE_VALUE;
-            status = vm_mcal_serial_device_configure(device,
-                                                     &g_vm_windows_serial_driver,
-                                                     config,
-                                                     &g_vm_windows_serial_ops,
-                                                     context);
-            if (status == VM_OK)
-            {
-                *out_device = device;
-            }
-            else
-            {
-                free(context);
-                free(device);
-            }
-        }
-    }
-
-    return status;
-}
-
-const vm_mcal_serial_driver_t *vm_mcal_serial_windows_driver_get(void)
-{
-    return &g_vm_windows_serial_driver;
-}
-
-#else
-
-static uint8_t vm_windows_serial_match(const vm_mcal_serial_config_t *config)
-{
-    (void)config;
-    return 0u;
-}
-
-static vm_status_t vm_windows_serial_create(
-    const vm_mcal_serial_config_t *config,
-    vm_mcal_serial_device_t **out_device)
-{
-    (void)config;
-    if (out_device != NULL)
-    {
-        *out_device = NULL;
-    }
-    return VM_UNSUPPORTED;
-}
-
-static const vm_mcal_serial_driver_t g_vm_windows_serial_driver =
-{
-    "windows_serial",
-    vm_windows_serial_match,
-    vm_windows_serial_create
-};
-
-const vm_mcal_serial_driver_t *vm_mcal_serial_windows_driver_get(void)
-{
-    return &g_vm_windows_serial_driver;
-}
-
-#endif
